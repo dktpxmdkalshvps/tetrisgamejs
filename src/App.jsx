@@ -3,227 +3,344 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const COLS = 10;
 const ROWS = 20;
-const CELL = 28;
-
-const TETROMINOES = {
-  I: { shape: [[1,1,1,1]],         color: "#00f5ff" },
-  O: { shape: [[1,1],[1,1]],       color: "#ffe600" },
-  T: { shape: [[0,1,0],[1,1,1]],   color: "#d966ff" },
-  S: { shape: [[0,1,1],[1,1,0]],   color: "#00ff88" },
-  Z: { shape: [[1,1,0],[0,1,1]],   color: "#ff3a5c" },
-  J: { shape: [[1,0,0],[1,1,1]],   color: "#3d9bff" },
-  L: { shape: [[0,0,1],[1,1,1]],   color: "#ffaa00" },
-};
-
-const PIECE_KEYS = Object.keys(TETROMINOES);
+const CELL = 34;
 const LINE_SCORES = [0, 100, 300, 500, 800];
 const LINE_NAMES  = ["", "SINGLE", "DOUBLE", "TRIPLE", "TETRIS!"];
-const CLEAR_MS    = 320;
+const CLEAR_MS    = 340;
+
+// 이미지의 유리 버블 타일 색상 팔레트
+const PALETTE = {
+  I: { base:"#5BC4C4", mid:"#3A9EA0", deep:"#1E7070", shine:"rgba(255,255,255,0.75)", tint:"rgba(91,196,196,0.18)" },
+  O: { base:"#C8B878", mid:"#A89050", deep:"#786030", shine:"rgba(255,245,200,0.7)",  tint:"rgba(200,184,120,0.18)" },
+  T: { base:"#8AAAB8", mid:"#607A88", deep:"#3C5460", shine:"rgba(220,240,255,0.7)",  tint:"rgba(138,170,184,0.18)" },
+  S: { base:"#2A9090", mid:"#1A6A6A", deep:"#0A4040", shine:"rgba(160,255,240,0.65)", tint:"rgba(42,144,144,0.18)" },
+  Z: { base:"#1A4070", mid:"#102A50", deep:"#081830", shine:"rgba(140,190,255,0.55)", tint:"rgba(26,64,112,0.18)" },
+  J: { base:"#0C1E3C", mid:"#081428", deep:"#040C1C", shine:"rgba(100,160,255,0.45)", tint:"rgba(12,30,60,0.2)"  },
+  L: { base:"#D8E8F0", mid:"#A8C0CC", deep:"#789098", shine:"rgba(255,255,255,0.85)", tint:"rgba(216,232,240,0.22)" },
+};
+
+const TETROMINOES = {
+  I: { shape:[[1,1,1,1]] },
+  O: { shape:[[1,1],[1,1]] },
+  T: { shape:[[0,1,0],[1,1,1]] },
+  S: { shape:[[0,1,1],[1,1,0]] },
+  Z: { shape:[[1,1,0],[0,1,1]] },
+  J: { shape:[[1,0,0],[1,1,1]] },
+  L: { shape:[[0,0,1],[1,1,1]] },
+};
+const PIECE_KEYS = Object.keys(TETROMINOES);
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-const createBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-const rotateCW = shape => shape[0].map((_, ci) => shape.map(r => r[ci]).reverse());
+const createBoard = () => Array.from({length:ROWS}, () => Array(COLS).fill(null));
+const rotateCW = s => s[0].map((_,ci) => s.map(r=>r[ci]).reverse());
 
 function randomPiece() {
-  const key = PIECE_KEYS[Math.floor(Math.random() * PIECE_KEYS.length)];
-  const { shape, color } = TETROMINOES[key];
-  return { shape, color, x: Math.floor(COLS / 2) - Math.ceil(shape[0].length / 2), y: 0 };
+  const key = PIECE_KEYS[Math.floor(Math.random()*PIECE_KEYS.length)];
+  return { key, shape:[...TETROMINOES[key].shape.map(r=>[...r])],
+           x: Math.floor(COLS/2)-Math.ceil(TETROMINOES[key].shape[0].length/2), y:0 };
 }
-
 function isValid(board, shape, x, y) {
-  for (let r = 0; r < shape.length; r++)
-    for (let c = 0; c < shape[r].length; c++) {
-      if (!shape[r][c]) continue;
-      const nr = r + y, nc = c + x;
-      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) return false;
-      if (board[nr][nc]) return false;
-    }
-  return true;
+  for (let r=0;r<shape.length;r++) for (let c=0;c<shape[r].length;c++) {
+    if (!shape[r][c]) continue;
+    const nr=r+y, nc=c+x;
+    if (nr<0||nr>=ROWS||nc<0||nc>=COLS||board[nr][nc]) return false;
+  } return true;
 }
-
 function lockPiece(board, piece) {
-  const next = board.map(r => [...r]);
-  for (let r = 0; r < piece.shape.length; r++)
-    for (let c = 0; c < piece.shape[r].length; c++)
-      if (piece.shape[r][c])
-        next[piece.y + r][piece.x + c] = piece.color;
-  return next;
+  const b=board.map(r=>[...r]);
+  piece.shape.forEach((row,r)=>row.forEach((cell,c)=>{ if(cell) b[piece.y+r][piece.x+c]=piece.key; }));
+  return b;
+}
+function findFullRows(board) { return board.reduce((a,row,i)=>{if(row.every(c=>c))a.push(i);return a;},[]);}
+function removeLines(board,rows) {
+  const kept=board.filter((_,i)=>!rows.includes(i));
+  return [...Array.from({length:rows.length},()=>Array(COLS).fill(null)),...kept];
+}
+function getGhost(board,piece) {
+  let g={...piece}; while(isValid(board,g.shape,g.x,g.y+1)) g={...g,y:g.y+1}; return g;
 }
 
-function findFullRows(board) {
-  return board.reduce((acc, row, i) => { if (row.every(c => c)) acc.push(i); return acc; }, []);
+// ── GLASS BUBBLE TILE ─────────────────────────────────────────────────────────
+// SVG defs — 각 색상별 그라디언트를 정의
+function SvgDefs() {
+  return (
+    <defs>
+      {/* 타일 외곽 프레임 그라디언트 (플라스틱 테두리) */}
+      <linearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%"   stopColor="rgba(255,255,255,0.55)"/>
+        <stop offset="40%"  stopColor="rgba(255,255,255,0.15)"/>
+        <stop offset="100%" stopColor="rgba(180,180,180,0.25)"/>
+      </linearGradient>
+
+      {Object.entries(PALETTE).map(([key, p]) => (
+        <g key={key}>
+          {/* 버블 돔 베이스 */}
+          <radialGradient id={`dome_${key}`} cx="42%" cy="38%" r="55%" fx="38%" fy="34%">
+            <stop offset="0%"   stopColor={p.shine}/>
+            <stop offset="28%"  stopColor={p.base} stopOpacity="0.92"/>
+            <stop offset="65%"  stopColor={p.mid}  stopOpacity="0.95"/>
+            <stop offset="100%" stopColor={p.deep} stopOpacity="1"/>
+          </radialGradient>
+          {/* 유리 반사 하이라이트 */}
+          <radialGradient id={`shine_${key}`} cx="35%" cy="28%" r="45%">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.9)"/>
+            <stop offset="50%"  stopColor="rgba(255,255,255,0.3)"/>
+            <stop offset="100%" stopColor="rgba(255,255,255,0)"/>
+          </radialGradient>
+          {/* 타일 배경 틴트 */}
+          <radialGradient id={`bg_${key}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stopColor={p.base} stopOpacity="0.22"/>
+            <stop offset="100%" stopColor={p.base} stopOpacity="0.06"/>
+          </radialGradient>
+        </g>
+      ))}
+
+      {/* 고스트 그라디언트 */}
+      <radialGradient id="ghost_dome" cx="42%" cy="38%" r="55%">
+        <stop offset="0%"   stopColor="rgba(255,255,255,0.4)"/>
+        <stop offset="100%" stopColor="rgba(180,200,220,0.15)"/>
+      </radialGradient>
+
+      {/* 드롭 섀도우 필터 */}
+      <filter id="tileShad" x="-15%" y="-15%" width="130%" height="130%">
+        <feDropShadow dx="1" dy="2" stdDeviation="2" floodColor="rgba(0,0,0,0.22)"/>
+      </filter>
+      <filter id="glowFilter" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  );
 }
 
-function removeLines(board, rows) {
-  const kept = board.filter((_, i) => !rows.includes(i));
-  const empty = Array.from({ length: rows.length }, () => Array(COLS).fill(null));
-  return [...empty, ...kept];
+// 유리 버블 타일 한 칸
+function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size=CELL }) {
+  const p = PALETTE[tileKey] || PALETTE.I;
+  const pad = 1.5;
+  const inner = size - pad*2;
+  const cr = 4; // corner radius
+  const bx = cx+pad, by = cy+pad;
+
+  if (flash) return (
+    <rect x={bx} y={by} width={inner} height={inner} fill="rgba(255,255,255,0.9)" rx={cr}/>
+  );
+
+  if (ghost) return (
+    <g opacity={0.38}>
+      {/* 프레임 */}
+      <rect x={bx} y={by} width={inner} height={inner} fill="rgba(255,255,255,0.05)"
+        stroke="rgba(255,255,255,0.35)" strokeWidth={1} rx={cr}/>
+      {/* 버블 아웃라인 */}
+      <ellipse cx={cx+size/2} cy={cy+size/2}
+        rx={inner*0.38} ry={inner*0.38}
+        fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1}/>
+    </g>
+  );
+
+  const cx2=cx+size/2, cy2=cy+size/2;
+  const br=inner*0.40;  // bubble radius
+
+  return (
+    <g filter="url(#tileShad)">
+      {/* 타일 배경 (반투명 틴트) */}
+      <rect x={bx} y={by} width={inner} height={inner}
+        fill={`url(#bg_${tileKey})`} rx={cr}/>
+
+      {/* 플라스틱 프레임 테두리 */}
+      <rect x={bx} y={by} width={inner} height={inner}
+        fill="none" stroke="url(#frameGrad)" strokeWidth={1.2} rx={cr}/>
+
+      {/* 버블 돔 */}
+      <ellipse cx={cx2} cy={cy2} rx={br} ry={br}
+        fill={`url(#dome_${tileKey})`}/>
+
+      {/* 버블 테두리 (반투명) */}
+      <ellipse cx={cx2} cy={cy2} rx={br} ry={br}
+        fill="none" stroke={p.mid} strokeWidth={0.8} opacity={0.5}/>
+
+      {/* 하이라이트 (렌즈 반사) */}
+      <ellipse cx={cx+size*0.36} cy={cy+size*0.32}
+        rx={br*0.55} ry={br*0.38}
+        fill={`url(#shine_${tileKey})`} opacity={0.88}/>
+
+      {/* 하단 미세 반사 */}
+      <ellipse cx={cx2} cy={cy+size*0.72}
+        rx={br*0.3} ry={br*0.12}
+        fill="rgba(255,255,255,0.2)"/>
+
+      {/* 프레임 내부 모서리 인셋 하이라이트 */}
+      <rect x={bx+2} y={by+2} width={inner-4} height={3}
+        fill="rgba(255,255,255,0.4)" rx={1}/>
+      <rect x={bx+2} y={by+2} width={3} height={inner-4}
+        fill="rgba(255,255,255,0.25)" rx={1}/>
+    </g>
+  );
 }
 
-function getGhost(board, piece) {
-  let g = { ...piece };
-  while (isValid(board, g.shape, g.x, g.y + 1)) g = { ...g, y: g.y + 1 };
-  return g;
+// 미니 프리뷰용 타일 (Next 패널)
+function MiniTile({ cx, cy, tileKey, size=22 }) {
+  const p = PALETTE[tileKey];
+  const pad=1, inner=size-pad*2, cr=3;
+  const cx2=cx+size/2, cy2=cy+size/2, br=inner*0.38;
+  return (
+    <g>
+      <rect x={cx+pad} y={cy+pad} width={inner} height={inner}
+        fill={`url(#bg_${tileKey})`} rx={cr}/>
+      <rect x={cx+pad} y={cy+pad} width={inner} height={inner}
+        fill="none" stroke="url(#frameGrad)" strokeWidth={1} rx={cr}/>
+      <ellipse cx={cx2} cy={cy2} rx={br} ry={br} fill={`url(#dome_${tileKey})`}/>
+      <ellipse cx={cx+size*0.36} cy={cy+size*0.32}
+        rx={br*0.52} ry={br*0.36} fill={`url(#shine_${tileKey})`} opacity={0.82}/>
+    </g>
+  );
 }
 
 // ── NEXT PIECE PREVIEW ────────────────────────────────────────────────────────
 function NextPreview({ piece }) {
-  const P = 22;
-  if (!piece) return <div style={{ height: 70 }} />;
-  const offX = Math.floor((4 - piece.shape[0].length) / 2);
-  const offY = Math.floor((2 - piece.shape.length) / 2);
+  const SZ=24, maxW=4, maxH=2;
+  if (!piece) return <div style={{height:70}}/>;
+  const offX=Math.floor((maxW-piece.shape[0].length)/2);
+  const offY=Math.floor((maxH-piece.shape.length)/2);
+  const W=maxW*SZ, H=(maxH+0.5)*SZ;
   return (
-    <svg width={4*P} height={3*P} style={{ display:"block", margin:"0 auto" }}>
-      {piece.shape.map((row, ri) => row.map((cell, ci) => !cell ? null : (
-        <g key={`${ri}-${ci}`}>
-          <rect x={(ci+offX)*P+2} y={(ri+offY)*P+2} width={P-4} height={P-4} fill={piece.color} rx={2}/>
-          <rect x={(ci+offX)*P+3} y={(ri+offY)*P+3} width={P-6} height={5} fill="rgba(255,255,255,0.35)" rx={1}/>
-        </g>
+    <svg width={W} height={H} style={{display:"block",margin:"0 auto",overflow:"visible"}}>
+      <SvgDefs/>
+      {piece.shape.map((row,ri)=>row.map((cell,ci)=>!cell?null:(
+        <MiniTile key={`${ri}-${ci}`}
+          cx={(ci+offX)*SZ} cy={(ri+offY)*SZ}
+          tileKey={piece.key} size={SZ}/>
       )))}
     </svg>
   );
 }
 
-// ── STAT CARD ─────────────────────────────────────────────────────────────────
-function StatCard({ label, children, accent, glow }) {
+// ── UI COMPONENTS ─────────────────────────────────────────────────────────────
+function Card({ children, accent, glow, style={} }) {
+  const col = accent||"rgba(180,210,220,0.3)";
   return (
     <div style={{
-      background:"#0d0d18",
-      border:`1px solid ${glow ? (accent||"#00f5ff")+"55" : "#1a1a28"}`,
-      borderRadius:6, padding:"10px 14px",
-      boxShadow: glow ? `0 0 16px ${accent||"#00f5ff"}33` : "none",
+      background:"rgba(255,255,255,0.55)",
+      border:`1px solid ${glow?col:"rgba(180,210,220,0.5)"}`,
+      borderRadius:10,
+      padding:"10px 14px",
+      backdropFilter:"blur(8px)",
+      boxShadow: glow
+        ? `0 4px 20px ${col}88, inset 0 1px 0 rgba(255,255,255,0.8)`
+        : "0 2px 8px rgba(0,60,80,0.08), inset 0 1px 0 rgba(255,255,255,0.7)",
       transition:"all 0.3s",
+      ...style,
     }}>
-      <div style={{ fontSize:9, letterSpacing:4, color:"#2e2e48", marginBottom:5, textTransform:"uppercase" }}>{label}</div>
       {children}
     </div>
   );
 }
 
-function NumDisplay({ value, color, size=20 }) {
+function Label({ children }) {
+  return <div style={{fontSize:9,letterSpacing:4,color:"rgba(60,100,110,0.5)",marginBottom:5,textTransform:"uppercase"}}>{children}</div>;
+}
+
+function BigNum({ value, color="#1A5060", size=22, flash=false }) {
   return (
     <div style={{
       fontSize:size, fontWeight:900, letterSpacing:2, color,
-      textShadow:`0 0 12px ${color}99`, lineHeight:1,
+      fontFamily:"'Courier New',monospace",
+      textShadow:`0 1px 0 rgba(255,255,255,0.8)`,
+      animation:flash?"scoreJump 0.4s ease":"none",
     }}>{value}</div>
   );
 }
 
-// ── LEVEL GAUGE ───────────────────────────────────────────────────────────────
-function LevelGauge({ lines, level }) {
-  const pct = (lines % 10) / 10 * 100;
-  const palette = ["#00f5ff","#00ff88","#ffe600","#ffaa00","#ff3a5c","#d966ff"];
-  const col = palette[(level-1) % palette.length];
+function LevelBar({ lines, level }) {
+  const pct=(lines%10)/10*100;
+  const cols=["#3AACAC","#2A8A8A","#C8B878","#8AAAB8","#5A8080","#4A7090"];
+  const col=cols[(level-1)%cols.length];
   return (
-    <StatCard label="LEVEL">
-      <NumDisplay value={String(level).padStart(2,"0")} color={col} size={26}/>
-      <div style={{ marginTop:10, height:5, background:"#111120", borderRadius:3, overflow:"hidden" }}>
-        <div style={{
-          height:"100%", width:`${pct}%`,
-          background:`linear-gradient(90deg,${col}66,${col})`,
-          boxShadow:`0 0 8px ${col}`,
-          borderRadius:3, transition:"width 0.3s ease",
-        }}/>
+    <Card>
+      <Label>LEVEL</Label>
+      <BigNum value={String(level).padStart(2,"0")} color={col} size={28}/>
+      <div style={{marginTop:8,height:6,background:"rgba(0,80,100,0.1)",borderRadius:3,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${pct}%`,background:col,borderRadius:3,transition:"width 0.3s ease",opacity:0.8}}/>
       </div>
-      <div style={{ display:"flex", gap:3, marginTop:6 }}>
+      <div style={{display:"flex",gap:3,marginTop:5}}>
         {Array.from({length:10},(_,i)=>(
           <div key={i} style={{
-            flex:1, height:3, borderRadius:1,
-            background: i < lines%10 ? col : "#1a1a2e",
-            boxShadow: i < lines%10 ? `0 0 4px ${col}` : "none",
+            flex:1,height:3,borderRadius:2,
+            background:i<lines%10?col:"rgba(0,80,100,0.12)",
             transition:"all 0.2s",
           }}/>
         ))}
       </div>
-      <div style={{ fontSize:9, color:"#2a2a44", letterSpacing:2, marginTop:6 }}>
-        {10-(lines%10)} lines to next
+      <div style={{fontSize:9,color:"rgba(60,100,110,0.45)",marginTop:4,letterSpacing:2}}>
+        {10-lines%10} to next
       </div>
-    </StatCard>
+    </Card>
   );
 }
 
-// ── SPEED METER ───────────────────────────────────────────────────────────────
-function SpeedMeter({ level }) {
-  const palette = ["#00f5ff","#00ff88","#ffe600","#ffaa00","#ff3a5c","#d966ff","#00f5ff","#00ff88","#ffe600","#ff3a5c"];
-  return (
-    <StatCard label="SPEED">
-      <div style={{ display:"flex", gap:3, marginTop:4 }}>
-        {Array.from({length:10},(_,i)=>{
-          const on = i < Math.min(level,10);
-          return (
-            <div key={i} style={{
-              flex:1, height:22, borderRadius:3,
-              background: on ? palette[i] : "#111120",
-              boxShadow: on ? `0 0 6px ${palette[i]}` : "none",
-              transition:"all 0.3s",
-            }}/>
-          );
-        })}
-      </div>
-    </StatCard>
-  );
-}
-
-// ── SCORING TABLE ─────────────────────────────────────────────────────────────
-function ScoringTable() {
-  const rows = [["1-LINE","100"],["2-LINE","300"],["3-LINE","500"],["TETRIS","800"]];
-  return (
-    <StatCard label="SCORING">
-      {rows.map(([k,v]) => (
-        <div key={k} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-          <span style={{ fontSize:9, color: k==="TETRIS"?"#ffe60088":"#1e2e3e", letterSpacing:2 }}>{k}</span>
-          <span style={{ fontSize:9, color:"#1e2e3e", letterSpacing:1 }}>{v} pts</span>
-        </div>
-      ))}
-      <div style={{ fontSize:8, color:"#1a1a30", marginTop:4, letterSpacing:1 }}>× combo multiplier</div>
-    </StatCard>
-  );
-}
-
-// ── CONTROLS CARD ─────────────────────────────────────────────────────────────
 function ControlsCard() {
-  const keys=[["← →","이동"],["↑  Z","회전"],["↓","소프트 드롭"],["SPACE","하드 드롭"],["ESC","일시정지"]];
+  const keys=[["← →","이동"],["↑  Z","회전"],["↓","소프트"],["SPC","하드 드롭"],["ESC","일시정지"]];
   return (
-    <StatCard label="CONTROLS">
+    <Card>
+      <Label>CONTROLS</Label>
       {keys.map(([k,v])=>(
-        <div key={k} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:7 }}>
+        <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
           <kbd style={{
-            background:"#111120", border:"1px solid #1e1e34", borderRadius:3,
-            padding:"2px 7px", fontSize:9, color:"#00f5ff", letterSpacing:1,
-            fontFamily:"'Courier New',monospace",
+            background:"rgba(255,255,255,0.7)",border:"1px solid rgba(100,160,180,0.3)",
+            borderRadius:3,padding:"1px 7px",fontSize:9,
+            color:"#2A7080",fontFamily:"'Courier New',monospace",letterSpacing:1,
+            boxShadow:"0 1px 0 rgba(0,0,0,0.1)",
           }}>{k}</kbd>
-          <span style={{ fontSize:9, color:"#1e2e3e", letterSpacing:1 }}>{v}</span>
+          <span style={{fontSize:9,color:"rgba(60,100,110,0.45)",letterSpacing:1}}>{v}</span>
         </div>
       ))}
-    </StatCard>
+    </Card>
+  );
+}
+
+function ScoringCard() {
+  return (
+    <Card>
+      <Label>SCORING</Label>
+      {[["1-LINE","100"],["2-LINE","300"],["3-LINE","500"],["TETRIS","800"]].map(([k,v])=>(
+        <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+          <span style={{fontSize:9,color:k==="TETRIS"?"#A07020":"rgba(60,100,110,0.5)",letterSpacing:2}}>{k}</span>
+          <span style={{fontSize:9,color:"rgba(60,100,110,0.4)",letterSpacing:1}}>{v} pts</span>
+        </div>
+      ))}
+      <div style={{fontSize:8,color:"rgba(60,100,110,0.3)",marginTop:4,letterSpacing:1}}>× combo multiplier</div>
+    </Card>
   );
 }
 
 // ── SCORE POPUP ───────────────────────────────────────────────────────────────
 function ScorePopup({ popups }) {
   return (
-    <div style={{ position:"absolute", inset:0, pointerEvents:"none", zIndex:20 }}>
-      {popups.map(p => (
+    <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:20}}>
+      {popups.map(p=>(
         <div key={p.id} style={{
-          position:"absolute", left:"50%", top: p.row * CELL,
+          position:"absolute",left:"50%",top:p.row*CELL,
           transform:"translateX(-50%)",
-          color: p.count===4 ? "#ffe600" : "#ffffff",
-          fontSize: p.count===4 ? 20 : 14,
+          color:p.count===4?"#8A6010":"#2A6070",
+          fontSize:p.count===4?18:13,
           fontFamily:"'Courier New',monospace",
-          fontWeight:"bold", letterSpacing:3,
-          textShadow: p.count===4 ? "0 0 20px #ffe600,0 0 40px #ffe600" : "0 0 10px #fff",
+          fontWeight:900,letterSpacing:3,
+          textShadow:p.count===4?"0 2px 8px rgba(160,120,0,0.4)":"0 2px 6px rgba(0,100,120,0.3)",
           animation:"popFloat 0.9s ease-out forwards",
           whiteSpace:"nowrap",
+          background:"rgba(255,255,255,0.75)",
+          padding:"3px 10px",borderRadius:20,
+          backdropFilter:"blur(4px)",
+          border:"1px solid rgba(255,255,255,0.9)",
         }}>
-          {p.count===4 ? "✦ TETRIS! ✦" : LINE_NAMES[p.count]}
-          {p.bonus>1 && <span style={{ fontSize:10, marginLeft:6, color:"#ff9f0a" }}>×{p.bonus}</span>}
+          {p.count===4?"✦ TETRIS! ✦":LINE_NAMES[p.count]}
+          {p.bonus>1&&<span style={{fontSize:9,marginLeft:6,color:"#8A6010"}}>×{p.bonus}</span>}
         </div>
       ))}
     </div>
   );
 }
 
-// ── MAIN ──────────────────────────────────────────────────────────────────────
+// ── MAIN GAME ─────────────────────────────────────────────────────────────────
 export default function Tetris() {
   const [board, setBoard]         = useState(createBoard());
   const [current, setCurrent]     = useState(null);
@@ -242,316 +359,274 @@ export default function Tetris() {
   const [scoreFlash, setScoreFlash] = useState(false);
 
   const live = useRef({});
-  useEffect(() => {
-    live.current = { board, current, gameOver, paused, clearing, combo };
-  }, [board, current, gameOver, paused, clearing, combo]);
+  live.current = {board,current,gameOver,paused,clearing,combo};
 
-  // ── spawn ──────────────────────────────────────────────────────────────────
   const spawnPiece = useCallback((b) => {
     setNext(prev => {
-      const piece = prev || randomPiece();
-      if (!isValid(b, piece.shape, piece.x, piece.y)) { setGameOver(true); return prev; }
+      const piece = prev||randomPiece();
+      if (!isValid(b,piece.shape,piece.x,piece.y)) { setGameOver(true); return prev; }
       setCurrent(piece);
       return randomPiece();
     });
   }, []);
 
-  // ── settle ─────────────────────────────────────────────────────────────────
   const settle = useCallback((piece, b) => {
-    const locked = lockPiece(b, piece);
-    const full = findFullRows(locked);
-
-    if (full.length > 0) {
-      setClearing(true);
-      setClearRows(full);
-      setTimeout(() => {
-        const newBoard = removeLines(locked, full);
-        const count = full.length;
-        setBoard(newBoard);
-        setClearRows([]);
-        setClearing(false);
-        setLines(prev => { const nl=prev+count; setLevel(Math.floor(nl/10)+1); return nl; });
-        setCombo(prev => {
-          const newCombo = prev + 1;
-          const pts = LINE_SCORES[count] * newCombo;
-          setScore(s => { const ns=s+pts; setHiScore(h=>Math.max(h,ns)); return ns; });
+    const locked = lockPiece(b,piece);
+    const full   = findFullRows(locked);
+    if (full.length>0) {
+      setClearing(true); setClearRows(full);
+      setTimeout(()=>{
+        const nb=removeLines(locked,full);
+        const count=full.length;
+        setBoard(nb); setClearRows([]); setClearing(false);
+        setLines(prev=>{const nl=prev+count;setLevel(Math.floor(nl/10)+1);return nl;});
+        setCombo(prev=>{
+          const nc2=prev+1;
+          const pts=LINE_SCORES[count]*nc2;
+          setScore(s=>{const ns=s+pts;setHiScore(h=>Math.max(h,ns));return ns;});
           setScoreFlash(true); setTimeout(()=>setScoreFlash(false),500);
-          const topRow = Math.min(...full);
-          setPopups(ps => [...ps, { id:Date.now(), count, bonus:newCombo, row:topRow }]);
+          const tr=Math.min(...full);
+          setPopups(ps=>[...ps,{id:Date.now(),count,bonus:nc2,row:tr}]);
           setTimeout(()=>setPopups(ps=>ps.slice(1)),1000);
-          return newCombo;
+          return nc2;
         });
-        spawnPiece(newBoard);
-      }, CLEAR_MS);
-    } else {
-      setBoard(locked);
-      setCombo(0);
-      spawnPiece(locked);
-    }
-  }, [spawnPiece]);
+        spawnPiece(nb);
+      },CLEAR_MS);
+    } else { setBoard(locked); setCombo(0); spawnPiece(locked); }
+  },[spawnPiece]);
 
-  // ── gravity ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!started || gameOver || paused || !current || clearing) return;
-    const delay = Math.max(80, 800-(level-1)*72);
-    const id = setInterval(() => {
-      const { current:p, board:b, gameOver:go, paused:pa, clearing:cl } = live.current;
+  useEffect(()=>{
+    if (!started||gameOver||paused||!current||clearing) return;
+    const delay=Math.max(80,800-(level-1)*72);
+    const id=setInterval(()=>{
+      const {current:p,board:b,gameOver:go,paused:pa,clearing:cl}=live.current;
       if (!p||go||pa||cl) return;
-      if (isValid(b, p.shape, p.x, p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1}));
-      else settle(p, b);
-    }, delay);
-    return () => clearInterval(id);
-  }, [started, gameOver, paused, current, level, clearing, settle]);
+      if (isValid(b,p.shape,p.x,p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1}));
+      else settle(p,b);
+    },delay);
+    return ()=>clearInterval(id);
+  },[started,gameOver,paused,current,level,clearing,settle]);
 
-  // ── keyboard ───────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!started || gameOver) return;
-    const onKey = e => {
-      const { paused:pa, current:p, board:b, clearing:cl } = live.current;
-      if (e.key==="Escape") { setPaused(v=>!v); return; }
+  useEffect(()=>{
+    if (!started||gameOver) return;
+    const onKey=e=>{
+      const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+      if (e.key==="Escape"){setPaused(v=>!v);return;}
       if (pa||cl||!p) return;
-      if (e.key==="ArrowLeft")  { if(isValid(b,p.shape,p.x-1,p.y)) setCurrent(prev=>({...prev,x:prev.x-1})); }
+      if (e.key==="ArrowLeft") { if(isValid(b,p.shape,p.x-1,p.y)) setCurrent(prev=>({...prev,x:prev.x-1})); }
       else if (e.key==="ArrowRight") { if(isValid(b,p.shape,p.x+1,p.y)) setCurrent(prev=>({...prev,x:prev.x+1})); }
-      else if (e.key==="ArrowDown")  {
-        if(isValid(b,p.shape,p.x,p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1}));
-        else settle(p,b);
+      else if (e.key==="ArrowDown") {
+        if(isValid(b,p.shape,p.x,p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1})); else settle(p,b);
       } else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") {
         const rot=rotateCW(p.shape);
-        for (const dx of [0,-1,1,-2,2]) {
-          if(isValid(b,rot,p.x+dx,p.y)){ setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx})); break; }
-        }
+        for (const dx of [0,-1,1,-2,2]) if(isValid(b,rot,p.x+dx,p.y)){setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));break;}
       } else if (e.key===" ") {
         e.preventDefault();
         let gy=p.y; while(isValid(b,p.shape,p.x,gy+1)) gy++;
         settle({...p,y:gy},b);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [started, gameOver, settle]);
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[started,gameOver,settle]);
 
-  // ── start ──────────────────────────────────────────────────────────────────
-  const startGame = () => {
-    const b=createBoard(), p=randomPiece();
-    setBoard(b); setCurrent(p); setNext(randomPiece());
-    setScore(0); setLines(0); setLevel(1); setCombo(0);
-    setGameOver(false); setStarted(true); setPaused(false);
-    setClearRows([]); setClearing(false); setPopups([]);
+  const startGame=()=>{
+    const b=createBoard(),p=randomPiece();
+    setBoard(b);setCurrent(p);setNext(randomPiece());
+    setScore(0);setLines(0);setLevel(1);setCombo(0);
+    setGameOver(false);setStarted(true);setPaused(false);
+    setClearRows([]);setClearing(false);setPopups([]);
   };
 
-  // ── display board ──────────────────────────────────────────────────────────
-  const ghost = (current && !gameOver && !clearing) ? getGhost(board, current) : null;
-  const displayBoard = board.map(r=>[...r]);
-  if (ghost) ghost.shape.forEach((row,r) => row.forEach((cell,c) => {
+  // build display board
+  const ghost=(current&&!gameOver&&!clearing)?getGhost(board,current):null;
+  const displayBoard=board.map(r=>[...r]);
+  if (ghost) ghost.shape.forEach((row,r)=>row.forEach((cell,c)=>{
     if (!cell) return;
-    const nr=ghost.y+r, nc=ghost.x+c;
-    if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!displayBoard[nr][nc]) displayBoard[nr][nc]="__ghost__";
+    const nr=ghost.y+r,nc=ghost.x+c;
+    if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!displayBoard[nr][nc]) displayBoard[nr][nc]="__ghost__";
   }));
-  if (current&&!gameOver) current.shape.forEach((row,r) => row.forEach((cell,c) => {
+  if (current&&!gameOver) current.shape.forEach((row,r)=>row.forEach((cell,c)=>{
     if (!cell) return;
-    const nr=current.y+r, nc=current.x+c;
-    if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) displayBoard[nr][nc]=current.color;
+    const nr=current.y+r,nc=current.x+c;
+    if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) displayBoard[nr][nc]=current.key;
   }));
 
   const BW=COLS*CELL, BH=ROWS*CELL;
-  const newHi = score>0 && score>=hiScore;
+  const newHi=score>0&&score>=hiScore;
+  const comboActive=combo>1;
 
   return (
     <div style={{
-      minHeight:"100vh", background:"#07070f",
-      display:"flex", alignItems:"center", justifyContent:"center",
+      minHeight:"100vh",
+      background:"linear-gradient(145deg,#E8F2F5 0%,#D0E8EC 35%,#E4EEF0 65%,#F0EBE0 100%)",
+      display:"flex",alignItems:"center",justifyContent:"center",
       fontFamily:"'Courier New',monospace",
-      backgroundImage:`
-        radial-gradient(ellipse 55% 50% at 15% 50%,#0e0520 0%,transparent 70%),
-        radial-gradient(ellipse 55% 50% at 85% 50%,#001a24 0%,transparent 70%)
-      `,
     }}>
       <style>{`
-        @keyframes popFloat {
-          0%   { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
-          60%  { opacity:1; transform:translateX(-50%) translateY(-36px) scale(1.12); }
-          100% { opacity:0; transform:translateX(-50%) translateY(-64px) scale(0.88); }
+        @keyframes popFloat{0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}60%{opacity:1;transform:translateX(-50%) translateY(-32px) scale(1.08)}100%{opacity:0;transform:translateX(-50%) translateY(-56px) scale(0.9)}}
+        @keyframes scoreJump{0%,100%{transform:scale(1)}40%{transform:scale(1.2)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes tileWave{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+        .glass-btn{
+          cursor:pointer;border-radius:24px;
+          font-family:'Courier New',monospace;font-size:11px;
+          letter-spacing:4px;padding:10px 28px;text-transform:uppercase;
+          transition:all 0.2s;
+          background:rgba(255,255,255,0.7);
+          border:1px solid rgba(100,180,190,0.5);
+          color:#2A7080;
+          box-shadow:0 2px 12px rgba(0,100,120,0.15),inset 0 1px 0 rgba(255,255,255,0.9);
+          backdrop-filter:blur(8px);
         }
-        @keyframes dimPulse { 0%,100%{opacity:1} 50%{opacity:0.75} }
-        @keyframes rowBlink {
-          0%,100%{fill:white;opacity:0.85} 40%{fill:white;opacity:0} 70%{fill:white;opacity:0.7}
-        }
-        @keyframes scoreJump { 0%,100%{transform:scale(1)} 40%{transform:scale(1.22)} }
-        @keyframes fadeIn { from{opacity:0;transform:scale(0.97)} to{opacity:1;transform:scale(1)} }
-        .glow-btn {
-          cursor:pointer; background:transparent;
-          font-family:'Courier New',monospace; font-size:11px;
-          letter-spacing:4px; padding:9px 22px; text-transform:uppercase;
-          transition:all 0.2s; border-radius:4px;
+        .glass-btn:hover{
+          background:rgba(255,255,255,0.9);
+          box-shadow:0 4px 20px rgba(0,100,120,0.25),inset 0 1px 0 rgba(255,255,255,1);
+          transform:translateY(-1px);
         }
       `}</style>
 
-      {/* CRT scanlines */}
-      <div style={{ position:"fixed",inset:0,pointerEvents:"none",zIndex:200,
-        background:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px)"
-      }}/>
+      <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
 
-      <div style={{ display:"flex", gap:12, alignItems:"stretch" }}>
+        {/* ══ LEFT PANEL ══ */}
+        <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
-        {/* ════ LEFT PANEL ════ */}
-        <div style={{ display:"flex",flexDirection:"column",gap:10,width:152 }}>
-
-          {/* Hi-score */}
-          <StatCard label="HI-SCORE" accent="#ffe600" glow={newHi}>
-            <NumDisplay value={hiScore.toString().padStart(8,"0")} color={newHi?"#ffe600":"#2a2a44"} size={16}/>
-            {newHi && <div style={{fontSize:8,color:"#ffe60088",letterSpacing:3,marginTop:3,animation:"dimPulse 1s infinite"}}>✦ NEW RECORD</div>}
-          </StatCard>
+          {/* Hi-Score */}
+          <Card accent="#C8A030" glow={newHi}>
+            <Label>HI-SCORE</Label>
+            <BigNum value={hiScore.toString().padStart(8,"0")} color={newHi?"#8A6010":"rgba(60,100,110,0.4)"} size={14}/>
+            {newHi&&<div style={{fontSize:8,color:"#A07020",letterSpacing:3,marginTop:3}}>✦ NEW RECORD</div>}
+          </Card>
 
           {/* Score */}
-          <div style={{
-            background:"#0d0d18",
-            border:`1px solid ${scoreFlash?"#00f5ff66":"#1a1a28"}`,
-            borderRadius:6,padding:"10px 14px",
-            boxShadow:scoreFlash?"0 0 24px #00f5ff44":"none",
-            animation:scoreFlash?"scoreJump 0.4s ease":"none",
-            transition:"box-shadow 0.3s",
-          }}>
-            <div style={{fontSize:9,letterSpacing:4,color:"#2e2e48",marginBottom:5}}>SCORE</div>
-            <div style={{
-              fontSize:19,fontWeight:900,letterSpacing:2,color:"#00f5ff",
-              textShadow:"0 0 14px #00f5ff99",
-            }}>{score.toString().padStart(8,"0")}</div>
-          </div>
+          <Card glow={scoreFlash} accent="rgba(0,150,180,0.5)">
+            <Label>SCORE</Label>
+            <BigNum value={score.toString().padStart(8,"0")} color="#1A6070" size={17} flash={scoreFlash}/>
+          </Card>
 
           {/* Lines */}
-          <StatCard label="LINES">
-            <NumDisplay value={lines.toString().padStart(4,"0")} color="#00ff88"/>
-          </StatCard>
+          <Card>
+            <Label>LINES</Label>
+            <BigNum value={lines.toString().padStart(4,"0")} color="#2A8A70"/>
+          </Card>
 
           {/* Combo */}
-          <StatCard label="COMBO" accent="#ffaa00" glow={combo>1}>
+          <Card accent={comboActive?"rgba(160,120,0,0.4)":undefined} glow={comboActive}>
+            <Label>COMBO</Label>
             <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-              <div style={{
-                fontSize:32,fontWeight:900,color:combo>1?"#ffaa00":"#181828",
-                textShadow:combo>1?"0 0 16px #ffaa00":"none",
-                transition:"all 0.3s",lineHeight:1,
-              }}>{combo}</div>
-              {combo>1 && <div style={{fontSize:11,color:"#ffaa00",letterSpacing:2}}>×{combo}</div>}
+              <BigNum value={combo} color={comboActive?"#8A6010":"rgba(60,100,110,0.2)"} size={32}/>
+              {comboActive&&<span style={{fontSize:11,color:"#8A6010",letterSpacing:2}}>×{combo}</span>}
             </div>
-            {combo>1&&<div style={{fontSize:8,color:"#ffaa0066",letterSpacing:3,marginTop:2}}>MULTIPLIER ON</div>}
-          </StatCard>
+            {comboActive&&<div style={{fontSize:8,color:"#A07030",letterSpacing:2,marginTop:2}}>MULTIPLIER ACTIVE</div>}
+          </Card>
 
           <div style={{flex:1}}/>
           <ControlsCard/>
         </div>
 
-        {/* ════ BOARD ════ */}
+        {/* ══ BOARD ══ */}
         <div style={{display:"flex",flexDirection:"column"}}>
+          {/* 타이틀 */}
           <div style={{
-            textAlign:"center",fontSize:9,letterSpacing:8,color:"#181828",
-            marginBottom:6,animation:"dimPulse 4s ease-in-out infinite",
+            textAlign:"center",fontSize:11,letterSpacing:10,
+            color:"rgba(40,100,110,0.35)",marginBottom:8,
+            fontWeight:700,
           }}>TETRIS</div>
 
+          {/* 보드 컨테이너 */}
           <div style={{
             position:"relative",
-            background:"#05050e",
-            border:"1px solid #141422",
-            borderRadius:4,
-            boxShadow:"0 0 0 1px #00f5ff11, 0 0 40px #00f5ff08, inset 0 0 50px #00000055",
+            background:"rgba(255,255,255,0.35)",
+            border:"1px solid rgba(180,220,228,0.6)",
+            borderRadius:8,
+            boxShadow:"0 8px 32px rgba(0,80,100,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",
             overflow:"hidden",
+            backdropFilter:"blur(4px)",
           }}>
-            <svg width={BW} height={BH}>
-              {/* grid */}
+            <svg width={BW} height={BH} style={{display:"block"}}>
+              <SvgDefs/>
+
+              {/* 그리드 라인 */}
               {Array.from({length:ROWS+1},(_,i)=>(
-                <line key={`h${i}`} x1={0} y1={i*CELL} x2={BW} y2={i*CELL} stroke="#0b0b18" strokeWidth={1}/>
+                <line key={`h${i}`} x1={0} y1={i*CELL} x2={BW} y2={i*CELL}
+                  stroke="rgba(100,160,180,0.12)" strokeWidth={1}/>
               ))}
               {Array.from({length:COLS+1},(_,i)=>(
-                <line key={`v${i}`} x1={i*CELL} y1={0} x2={i*CELL} y2={BH} stroke="#0b0b18" strokeWidth={1}/>
+                <line key={`v${i}`} x1={i*CELL} y1={0} x2={i*CELL} y2={BH}
+                  stroke="rgba(100,160,180,0.12)" strokeWidth={1}/>
               ))}
 
-              {/* cells */}
+              {/* 셀 렌더링 */}
               {displayBoard.map((row,ri)=>row.map((cell,ci)=>{
                 if (!cell) return null;
-                const isGhost = cell==="__ghost__";
-                const color = isGhost?(current?.color||"#fff"):cell;
-                const isClearing = clearRows.includes(ri);
-                if (isGhost) return (
-                  <rect key={`${ri}-${ci}`}
-                    x={ci*CELL+2} y={ri*CELL+2} width={CELL-4} height={CELL-4}
-                    fill="none" stroke={color} strokeWidth={1} rx={1} opacity={0.28}
-                  />
-                );
-                const px=ci*CELL+1, py=ri*CELL+1, s=CELL-2;
+                const isGhost=cell==="__ghost__";
+                const key=isGhost?(current?.key||"I"):cell;
+                const isClearing=clearRows.includes(ri);
                 return (
-                  <g key={`${ri}-${ci}`}>
-                    {isClearing
-                      ? <rect x={px} y={py} width={s} height={s} fill="white" rx={1} style={{animation:`rowBlink ${CLEAR_MS}ms ease-in-out`}}/>
-                      : <>
-                          <rect x={px} y={py} width={s} height={s} fill={color} rx={1}/>
-                          <rect x={px+1} y={py+1} width={s-2} height={Math.floor(s*.28)} fill="rgba(255,255,255,0.32)" rx={1}/>
-                          <rect x={px+1} y={py+1} width={Math.floor(s*.17)} height={s-2} fill="rgba(255,255,255,0.13)" rx={1}/>
-                          <rect x={px+1} y={py+s-Math.floor(s*.17)} width={s-2} height={Math.floor(s*.17)} fill="rgba(0,0,0,0.22)" rx={1}/>
-                        </>
-                    }
-                  </g>
+                  <GlassTile key={`${ri}-${ci}`}
+                    cx={ci*CELL} cy={ri*CELL}
+                    tileKey={key}
+                    ghost={isGhost}
+                    flash={isClearing}
+                    size={CELL}
+                  />
                 );
               }))}
             </svg>
 
             <ScorePopup popups={popups}/>
 
-            {/* overlays */}
+            {/* 오버레이 */}
             {(!started||gameOver||paused)&&(
               <div style={{
                 position:"absolute",inset:0,
-                background:"rgba(5,5,14,0.91)",
-                display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,
-                backdropFilter:"blur(3px)",
-                animation:"fadeIn 0.2s ease",
+                background:"rgba(230,242,245,0.88)",
+                backdropFilter:"blur(12px)",
+                display:"flex",flexDirection:"column",alignItems:"center",
+                justifyContent:"center",gap:16,
+                animation:"fadeUp 0.25s ease",
               }}>
                 {gameOver?(
                   <>
-                    <div style={{fontSize:9,letterSpacing:6,color:"#2a1a20"}}>— GAME OVER —</div>
+                    <div style={{fontSize:9,letterSpacing:6,color:"rgba(60,100,110,0.4)"}}>— GAME OVER —</div>
                     <div style={{
-                      fontSize:38,fontWeight:900,color:"#ff3a5c",letterSpacing:4,
-                      textShadow:"0 0 20px #ff3a5c,0 0 60px #ff3a5c44",
-                      animation:"dimPulse 1.2s ease-in-out infinite",
+                      fontSize:38,fontWeight:900,color:"#1A5060",letterSpacing:4,
+                      textShadow:"0 2px 0 rgba(255,255,255,0.9),0 4px 12px rgba(0,80,100,0.2)",
                     }}>OVER</div>
-                    <div style={{fontSize:9,color:"#2a2a44",letterSpacing:3}}>FINAL SCORE</div>
-                    <div style={{fontSize:26,fontWeight:900,color:"#ffe600",textShadow:"0 0 14px #ffe600"}}>
-                      {score.toString().padStart(8,"0")}
-                    </div>
-                    {newHi&&<div style={{fontSize:9,color:"#ffe60099",letterSpacing:4,animation:"dimPulse 1s infinite"}}>✦ NEW HI-SCORE ✦</div>}
-                    <button className="glow-btn" onClick={startGame}
-                      style={{border:"1px solid #ff3a5c",color:"#ff3a5c",marginTop:6}}
-                      onMouseEnter={e=>{e.target.style.background="#ff3a5c22";e.target.style.boxShadow="0 0 18px #ff3a5c55";}}
-                      onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.boxShadow="none";}}>
-                      RETRY
-                    </button>
+                    <div style={{fontSize:9,color:"rgba(60,100,110,0.4)",letterSpacing:3}}>FINAL SCORE</div>
+                    <div style={{
+                      fontSize:26,fontWeight:900,color:"#8A6010",
+                      textShadow:"0 2px 0 rgba(255,255,255,0.9)",
+                    }}>{score.toString().padStart(8,"0")}</div>
+                    {newHi&&<div style={{fontSize:9,color:"#A07020",letterSpacing:4}}>✦ NEW HI-SCORE ✦</div>}
+                    <button className="glass-btn" onClick={startGame} style={{marginTop:6}}>RETRY</button>
                   </>
                 ):paused?(
                   <>
-                    <div style={{
-                      fontSize:26,fontWeight:900,color:"#00f5ff",letterSpacing:8,
-                      textShadow:"0 0 20px #00f5ff",animation:"dimPulse 2s ease-in-out infinite",
-                    }}>PAUSED</div>
-                    <button className="glow-btn" onClick={()=>setPaused(false)}
-                      style={{border:"1px solid #00f5ff",color:"#00f5ff"}}
-                      onMouseEnter={e=>{e.target.style.background="#00f5ff22";e.target.style.boxShadow="0 0 18px #00f5ff55";}}
-                      onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.boxShadow="none";}}>
-                      RESUME
-                    </button>
+                    <div style={{fontSize:24,fontWeight:900,color:"#1A6070",letterSpacing:8,
+                      textShadow:"0 2px 0 rgba(255,255,255,0.9)"}}>PAUSED</div>
+                    <button className="glass-btn" onClick={()=>setPaused(false)}>RESUME</button>
                   </>
                 ):(
                   <>
-                    <div style={{fontSize:9,letterSpacing:8,color:"#1a1a2e"}}>— ARCADE EDITION —</div>
+                    <div style={{fontSize:9,letterSpacing:8,color:"rgba(60,100,110,0.4)"}}>— ARCADE EDITION —</div>
                     <div style={{
-                      fontSize:46,fontWeight:900,letterSpacing:5,
-                      background:"linear-gradient(135deg,#00f5ff,#d966ff 50%,#ffe600)",
+                      fontSize:46,fontWeight:900,letterSpacing:4,
+                      background:"linear-gradient(135deg,#2A9090,#5BC4C4 40%,#A09050 70%,#C8B878)",
                       WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",
+                      textShadow:"none",
+                      filter:"drop-shadow(0 3px 6px rgba(0,100,120,0.2))",
                     }}>TETRIS</div>
-                    <div style={{fontSize:9,letterSpacing:4,color:"#2a2a44",marginTop:-10}}>PRESS START TO PLAY</div>
-                    <button className="glow-btn" onClick={startGame}
-                      style={{border:"1px solid #00f5ff",color:"#00f5ff",marginTop:8}}
-                      onMouseEnter={e=>{e.target.style.background="#00f5ff22";e.target.style.boxShadow="0 0 18px #00f5ff55";}}
-                      onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.boxShadow="none";}}>
-                      START GAME
-                    </button>
+                    {/* 샘플 타일 장식 */}
+                    <div style={{display:"flex",gap:4,margin:"4px 0"}}>
+                      {["I","S","O","T","L"].map(k=>(
+                        <svg key={k} width={28} height={28} style={{overflow:"visible"}}>
+                          <SvgDefs/>
+                          <GlassTile cx={0} cy={0} tileKey={k} size={28}/>
+                        </svg>
+                      ))}
+                    </div>
+                    <button className="glass-btn" onClick={startGame} style={{marginTop:8}}>START GAME</button>
                   </>
                 )}
               </div>
@@ -559,54 +634,57 @@ export default function Tetris() {
           </div>
         </div>
 
-        {/* ════ RIGHT PANEL ════ */}
-        <div style={{display:"flex",flexDirection:"column",gap:10,width:152}}>
+        {/* ══ RIGHT PANEL ══ */}
+        <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
           {/* NEXT PIECE */}
-          <div style={{
-            background:"#0d0d18",
-            border:`1px solid ${next?next.color+"44":"#1a1a28"}`,
-            borderRadius:6,padding:"10px 14px",
-            boxShadow:next?`0 0 18px ${next.color}22`:"none",
-            transition:"all 0.4s",
-          }}>
-            <div style={{fontSize:9,letterSpacing:4,color:"#2e2e48",marginBottom:8}}>NEXT PIECE</div>
+          <Card accent={next?PALETTE[next.key]?.base:"transparent"} glow={!!next}>
+            <Label>NEXT PIECE</Label>
             <NextPreview piece={next}/>
             {next&&(
               <div style={{
-                textAlign:"center",fontSize:9,letterSpacing:4,marginTop:6,
-                color:next.color,textShadow:`0 0 8px ${next.color}`,
-              }}>
-                {Object.entries(TETROMINOES).find(([,v])=>v.color===next.color)?.[0]||""}
-              </div>
+                textAlign:"center",fontSize:9,letterSpacing:4,marginTop:4,
+                color:PALETTE[next.key]?.mid||"#2A7080",
+              }}>{next.key}-PIECE</div>
             )}
-          </div>
+          </Card>
 
-          {/* Level gauge */}
-          <LevelGauge lines={lines} level={level}/>
+          {/* Level */}
+          <LevelBar lines={lines} level={level}/>
 
-          {/* Speed meter */}
-          <SpeedMeter level={level}/>
+          {/* Speed */}
+          <Card>
+            <Label>SPEED</Label>
+            <div style={{display:"flex",gap:3,marginTop:4}}>
+              {Array.from({length:10},(_,i)=>{
+                const on=i<Math.min(level,10);
+                const cols=["#3AACAC","#2A8A8A","#C8B878","#8AAAB8","#5A8080","#4A7090","#3AACAC","#2A8A8A","#C8B878","#1A4070"];
+                return (
+                  <div key={i} style={{
+                    flex:1,height:20,borderRadius:3,
+                    background:on?cols[i]:"rgba(0,80,100,0.08)",
+                    opacity:on?0.85:1,
+                    boxShadow:on?`0 1px 4px ${cols[i]}66`:"none",
+                    transition:"all 0.3s",
+                    border:on?"none":"1px solid rgba(0,80,100,0.1)",
+                  }}/>
+                );
+              })}
+            </div>
+          </Card>
 
-          {/* Scoring reference */}
-          <ScoringTable/>
+          <ScoringCard/>
 
           <div style={{flex:1}}/>
 
-          {/* Pause toggle */}
           {started&&!gameOver&&(
-            <button className="glow-btn" onClick={()=>setPaused(v=>!v)}
-              style={{
-                border:"1px solid #1a1a28",color:"#252540",
-                fontSize:10,letterSpacing:3,padding:"8px",width:"100%",
-              }}
-              onMouseEnter={e=>{e.target.style.borderColor="#00f5ff33";e.target.style.color="#00f5ff66";}}
-              onMouseLeave={e=>{e.target.style.borderColor="#1a1a28";e.target.style.color="#252540";}}>
+            <button className="glass-btn"
+              onClick={()=>setPaused(v=>!v)}
+              style={{fontSize:10,letterSpacing:3,padding:"8px",width:"100%"}}>
               {paused?"▶ RESUME":"⏸ PAUSE"}
             </button>
           )}
         </div>
-
       </div>
     </div>
   );
