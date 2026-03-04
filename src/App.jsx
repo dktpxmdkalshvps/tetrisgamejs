@@ -242,7 +242,9 @@ export default function Tetris() {
   const [scoreFlash, setScoreFlash] = useState(false);
 
   const live = useRef({});
-  live.current = { board, current, gameOver, paused, clearing, combo };
+  useEffect(() => {
+    live.current = { board, current, gameOver, paused, clearing, combo };
+  }, [board, current, gameOver, paused, clearing, combo]);
 
   // ── spawn ──────────────────────────────────────────────────────────────────
   const spawnPiece = useCallback((b) => {
