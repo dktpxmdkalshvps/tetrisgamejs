@@ -402,7 +402,12 @@ export default function Tetris() {
   useEffect(() => {
     const handleResize = () => {
       // Adjusted calculation to provide room at the bottom for mobile touch controls
-      const newCellSize = Math.floor(Math.min((window.innerHeight * 0.7) / ROWS, window.innerWidth * 0.9 / COLS));
+      // We check if the screen is narrow (mobile) and give more room to controls
+      const isMobile = window.innerWidth <= 768;
+      const heightMultiplier = isMobile ? 0.6 : 0.8;
+      const widthMultiplier = isMobile ? 0.95 : 0.9;
+
+      const newCellSize = Math.floor(Math.min((window.innerHeight * heightMultiplier) / ROWS, window.innerWidth * widthMultiplier / COLS));
       setCellSize(newCellSize);
     };
     handleResize();
@@ -638,9 +643,22 @@ export default function Tetris() {
         .mobile-controls {
           display: none !important;
         }
+        .main-layout {
+          display: flex; gap: 14px; align-items: flex-start;
+        }
+
         @media (max-width: 768px) {
           .mobile-controls {
             display: flex !important;
+          }
+          .main-layout {
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
+            /* Disable scale to let dynamic cellSize take over, making board use real screen real estate better */
+          }
+          .left-panel, .right-panel {
+            display: none !important;
           }
         }
       `}</style>
@@ -650,10 +668,10 @@ export default function Tetris() {
         {isDarkMode ? "☀ LIGHT" : "🌙 DARK"}
       </button>
 
-      <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+      <div className="main-layout">
 
         {/* ══ LEFT PANEL ══ */}
-        <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
+        <div className="left-panel" style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
           {/* Hi-Score */}
           <Card accent="#C8A030" glow={newHi} isDark={isDarkMode}>
@@ -799,7 +817,7 @@ export default function Tetris() {
         </div>
 
         {/* ══ RIGHT PANEL ══ */}
-        <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
+        <div className="right-panel" style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
           {/* NEXT PIECE */}
           <Card accent={next?PALETTE[next.key]?.base:"transparent"} glow={!!next} isDark={isDarkMode}>
@@ -855,24 +873,24 @@ export default function Tetris() {
       {started && !gameOver && !paused && (
         <div style={{
           position: "fixed", bottom: 10, left: "50%", transform: "translateX(-50%)",
-          display: "flex", gap: 30, zIndex: 50, padding: "10px",
+          display: "flex", gap: 30, zIndex: 9999, padding: "10px",
           background: "rgba(255,255,255,0.15)", borderRadius: 30, backdropFilter: "blur(10px)",
           border: "1px solid rgba(255,255,255,0.3)"
         }} className="mobile-controls">
           {/* Action Buttons */}
           <div style={{display: "flex", flexDirection: "column", gap: 10, justifyContent: "center"}}>
-            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); holdPiece();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10}}>HLD</button>
-            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); hardDrop();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10}}>DRP</button>
+            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); holdPiece();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10, touchAction: "none"}}>HLD</button>
+            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); hardDrop();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10, touchAction: "none"}}>DRP</button>
           </div>
 
           {/* D-Pad */}
           <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "center", justifyContent: "center"}}>
             <div/>
-            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); rotate();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>↻</button>
+            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); rotate();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>↻</button>
             <div/>
-            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveLeft();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>←</button>
-            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveDown();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>↓</button>
-            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveRight();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>→</button>
+            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); moveLeft();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>←</button>
+            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); moveDown();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>↓</button>
+            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); moveRight();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>→</button>
           </div>
         </div>
       )}
