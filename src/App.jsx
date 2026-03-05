@@ -126,9 +126,9 @@ function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size }) {
 
   if (ghost) return (
     <g>
-      {/* 프레임 */}
+      <rect x={bx} y={by} width={inner} height={inner} fill={p.base} opacity={0.15} rx={cr}/>
       <rect x={bx} y={by} width={inner} height={inner} fill="none"
-        stroke="rgba(255,255,255,0.45)" strokeWidth={2} rx={cr}/>
+        stroke={p.base} strokeWidth={2} opacity={0.8} rx={cr}/>
     </g>
   );
 
@@ -174,7 +174,6 @@ function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size }) {
 
 // 미니 프리뷰용 타일 (Next 패널)
 function MiniTile({ cx, cy, tileKey, size=22 }) {
-  const p = PALETTE[tileKey];
   const pad=1, inner=size-pad*2, cr=3;
   const cx2=cx+size/2, cy2=cy+size/2, br=inner*0.38;
   return (
@@ -401,7 +400,8 @@ export default function Tetris() {
 
   useEffect(() => {
     const handleResize = () => {
-      const newCellSize = Math.floor(window.innerHeight * 0.8 / ROWS);
+      // Adjusted calculation to provide room at the bottom for mobile touch controls
+      const newCellSize = Math.floor(Math.min((window.innerHeight * 0.7) / ROWS, window.innerWidth * 0.9 / COLS));
       setCellSize(newCellSize);
     };
     handleResize();
@@ -494,60 +494,84 @@ export default function Tetris() {
     return ()=>clearInterval(id);
   },[started,gameOver,paused,current,level,clearing,settle]);
 
+  const moveLeft = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    if(isValid(b,p.shape,p.x-1,p.y)) {
+      setCurrent(prev=>({...prev,x:prev.x-1}));
+      lastMoveWasRotation.current = false;
+    }
+  }, []);
+
+  const moveRight = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    if(isValid(b,p.shape,p.x+1,p.y)) {
+      setCurrent(prev=>({...prev,x:prev.x+1}));
+      lastMoveWasRotation.current = false;
+    }
+  }, []);
+
+  const moveDown = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    if(isValid(b,p.shape,p.x,p.y+1)) {
+      setCurrent(prev=>({...prev,y:prev.y+1}));
+      lastMoveWasRotation.current = false;
+    } else settle(p,b);
+  }, [settle]);
+
+  const rotate = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    const rot=rotateCW(p.shape);
+    for (const dx of [0,-1,1,-2,2]) {
+      if(isValid(b,rot,p.x+dx,p.y)){
+        setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));
+        lastMoveWasRotation.current = true;
+        break;
+      }
+    }
+  }, []);
+
+  const hardDrop = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    let gy=p.y; while(isValid(b,p.shape,p.x,gy+1)) gy++;
+    settle({...p,y:gy},b);
+  }, [settle]);
+
+  const holdPiece = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl,heldPiece:h,hasSwapped:hs}=live.current;
+    if (pa||cl||!p||hs) return;
+    setHasSwapped(true);
+    if (h) {
+      const newCurrent = { ...h, x: Math.floor(COLS/2)-Math.ceil(h.shape[0].length/2), y: 0 };
+      const newHeld = { ...p, x: 0, y: 0 };
+      if (isValid(b, newCurrent.shape, newCurrent.x, newCurrent.y)) {
+        setCurrent(newCurrent);
+        setHeldPiece(newHeld);
+      }
+    } else {
+      setHeldPiece({ ...p, x: 0, y: 0 });
+      spawnPiece(b);
+    }
+  }, [spawnPiece]);
+
   useEffect(()=>{
     if (!started||gameOver) return;
     const onKey=e=>{
-      const {paused:pa,current:p,board:b,clearing:cl,heldPiece:h,hasSwapped:hs}=live.current;
       if (e.key==="Escape"){setPaused(v=>!v);return;}
-      if (pa||cl||!p) return;
-      if (e.key==="ArrowLeft") {
-        if(isValid(b,p.shape,p.x-1,p.y)) {
-          setCurrent(prev=>({...prev,x:prev.x-1}));
-          lastMoveWasRotation.current = false;
-        }
-      }
-      else if (e.key==="ArrowRight") {
-        if(isValid(b,p.shape,p.x+1,p.y)) {
-          setCurrent(prev=>({...prev,x:prev.x+1}));
-          lastMoveWasRotation.current = false;
-        }
-      }
-      else if (e.key==="ArrowDown") {
-        if(isValid(b,p.shape,p.x,p.y+1)) {
-          setCurrent(prev=>({...prev,y:prev.y+1}));
-          lastMoveWasRotation.current = false;
-        } else settle(p,b);
-      } else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") {
-        const rot=rotateCW(p.shape);
-        for (const dx of [0,-1,1,-2,2]) {
-          if(isValid(b,rot,p.x+dx,p.y)){
-            setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));
-            lastMoveWasRotation.current = true;
-            break;
-          }
-        }
-      } else if (e.key===" ") {
-        e.preventDefault();
-        let gy=p.y; while(isValid(b,p.shape,p.x,gy+1)) gy++;
-        settle({...p,y:gy},b);
-      } else if ((e.key==="c"||e.key==="C")&&!hs) {
-        setHasSwapped(true);
-        if (h) {
-          const newCurrent = { ...h, x: Math.floor(COLS/2)-Math.ceil(h.shape[0].length/2), y: 0 };
-          const newHeld = { ...p, x: 0, y: 0 };
-          if (isValid(b, newCurrent.shape, newCurrent.x, newCurrent.y)) {
-            setCurrent(newCurrent);
-            setHeldPiece(newHeld);
-          }
-        } else {
-          setHeldPiece({ ...p, x: 0, y: 0 });
-          spawnPiece(b);
-        }
-      }
+      if (e.key==="ArrowLeft") moveLeft();
+      else if (e.key==="ArrowRight") moveRight();
+      else if (e.key==="ArrowDown") moveDown();
+      else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") rotate();
+      else if (e.key===" ") { e.preventDefault(); hardDrop(); }
+      else if (e.key==="c"||e.key==="C") holdPiece();
     };
     window.addEventListener("keydown",onKey);
     return ()=>window.removeEventListener("keydown",onKey);
-  },[started,gameOver,settle,spawnPiece]);
+  },[started,gameOver,moveLeft,moveRight,moveDown,rotate,hardDrop,holdPiece]);
 
   const startGame=()=>{
     fillBag();
@@ -582,10 +606,13 @@ export default function Tetris() {
     <div style={{
       minHeight:"100vh",
       background:"linear-gradient(145deg,#E8F2F5 0%,#D0E8EC 35%,#E4EEF0 65%,#F0EBE0 100%)",
+      backgroundSize:"400% 400%",
+      animation:"bgDrift 15s ease infinite",
       display:"flex",alignItems:"center",justifyContent:"center",
       fontFamily:"'Courier New',monospace",
     }}>
       <style>{`
+        @keyframes bgDrift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         @keyframes popFloat{0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}60%{opacity:1;transform:translateX(-50%) translateY(-32px) scale(1.08)}100%{opacity:0;transform:translateX(-50%) translateY(-56px) scale(0.9)}}
         @keyframes scoreJump{0%,100%{transform:scale(1)}40%{transform:scale(1.2)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -605,6 +632,14 @@ export default function Tetris() {
           background:rgba(255,255,255,0.9);
           box-shadow:0 4px 20px rgba(0,100,120,0.25),inset 0 1px 0 rgba(255,255,255,1);
           transform:translateY(-1px);
+        }
+        .mobile-controls {
+          display: none !important;
+        }
+        @media (max-width: 768px) {
+          .mobile-controls {
+            display: flex !important;
+          }
         }
       `}</style>
 
@@ -815,6 +850,32 @@ export default function Tetris() {
           )}
         </div>
       </div>
+
+      {/* Mobile Touch Controls */}
+      {started && !gameOver && !paused && (
+        <div style={{
+          position: "fixed", bottom: 10, left: "50%", transform: "translateX(-50%)",
+          display: "flex", gap: 30, zIndex: 50, padding: "10px",
+          background: "rgba(255,255,255,0.15)", borderRadius: 30, backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.3)"
+        }} className="mobile-controls">
+          {/* Action Buttons */}
+          <div style={{display: "flex", flexDirection: "column", gap: 10, justifyContent: "center"}}>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); holdPiece();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10}}>HLD</button>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); hardDrop();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10}}>DRP</button>
+          </div>
+
+          {/* D-Pad */}
+          <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "center", justifyContent: "center"}}>
+            <div/>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); rotate();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>↻</button>
+            <div/>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveLeft();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>←</button>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveDown();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>↓</button>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveRight();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>→</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
