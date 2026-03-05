@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { audio } from "./audio";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const COLS = 10;
@@ -6,19 +7,25 @@ const ROWS = 20;
 const CELL = 28;
 
 const TETROMINOES = {
-  I: { shape: [[1,1,1,1]],         color: "#00f5ff" },
-  O: { shape: [[1,1],[1,1]],       color: "#ffe600" },
-  T: { shape: [[0,1,0],[1,1,1]],   color: "#d966ff" },
-  S: { shape: [[0,1,1],[1,1,0]],   color: "#00ff88" },
-  Z: { shape: [[1,1,0],[0,1,1]],   color: "#ff3a5c" },
-  J: { shape: [[1,0,0],[1,1,1]],   color: "#3d9bff" },
-  L: { shape: [[0,0,1],[1,1,1]],   color: "#ffaa00" },
+  I: { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: "#00f5ff" },
+  O: { shape: [[1,1],[1,1]],                             color: "#ffe600" },
+  T: { shape: [[0,1,0],[1,1,1],[0,0,0]],                 color: "#d966ff" },
+  S: { shape: [[0,1,1],[1,1,0],[0,0,0]],                 color: "#00ff88" },
+  Z: { shape: [[1,1,0],[0,1,1],[0,0,0]],                 color: "#ff3a5c" },
+  J: { shape: [[1,0,0],[1,1,1],[0,0,0]],                 color: "#3d9bff" },
+  L: { shape: [[0,0,1],[1,1,1],[0,0,0]],                 color: "#ffaa00" },
 };
 
 const PIECE_KEYS = Object.keys(TETROMINOES);
 const LINE_SCORES = [0, 100, 300, 500, 800];
 const LINE_NAMES  = ["", "SINGLE", "DOUBLE", "TRIPLE", "TETRIS!"];
 const CLEAR_MS    = 320;
+
+const WALL_KICKS = {
+  // JLSTZ
+  N: [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+  I: [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
+};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const createBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -27,7 +34,7 @@ const rotateCW = shape => shape[0].map((_, ci) => shape.map(r => r[ci]).reverse(
 function randomPiece() {
   const key = PIECE_KEYS[Math.floor(Math.random() * PIECE_KEYS.length)];
   const { shape, color } = TETROMINOES[key];
-  return { shape, color, x: Math.floor(COLS / 2) - Math.ceil(shape[0].length / 2), y: 0 };
+  return { key, shape, color, x: Math.floor(COLS / 2) - Math.ceil(shape[0].length / 2), y: 0, rot: 0 };
 }
 
 function isValid(board, shape, x, y) {
@@ -229,7 +236,10 @@ export default function Tetris() {
   const [current, setCurrent]     = useState(null);
   const [next, setNext]           = useState(null);
   const [score, setScore]         = useState(0);
-  const [hiScore, setHiScore]     = useState(0);
+  const [hiScore, setHiScore]     = useState(() => {
+    const saved = localStorage.getItem("tetris_hiscore");
+    return saved ? parseInt(saved, 10) : 0;
+  });
   const [lines, setLines]         = useState(0);
   const [level, setLevel]         = useState(1);
   const [combo, setCombo]         = useState(0);
@@ -250,7 +260,11 @@ export default function Tetris() {
   const spawnPiece = useCallback((b) => {
     setNext(prev => {
       const piece = prev || randomPiece();
-      if (!isValid(b, piece.shape, piece.x, piece.y)) { setGameOver(true); return prev; }
+      if (!isValid(b, piece.shape, piece.x, piece.y)) {
+        setGameOver(true);
+        audio.stopBGM();
+        return prev;
+      }
       setCurrent(piece);
       return randomPiece();
     });
@@ -261,10 +275,13 @@ export default function Tetris() {
     const locked = lockPiece(b, piece);
     const full = findFullRows(locked);
 
+    audio.playDrop();
+
     if (full.length > 0) {
       setClearing(true);
       setClearRows(full);
       setTimeout(() => {
+        audio.playClear();
         const newBoard = removeLines(locked, full);
         const count = full.length;
         setBoard(newBoard);
@@ -274,7 +291,15 @@ export default function Tetris() {
         setCombo(prev => {
           const newCombo = prev + 1;
           const pts = LINE_SCORES[count] * newCombo;
-          setScore(s => { const ns=s+pts; setHiScore(h=>Math.max(h,ns)); return ns; });
+          setScore(s => {
+            const ns=s+pts;
+            setHiScore(h => {
+              const newHi = Math.max(h, ns);
+              localStorage.setItem("tetris_hiscore", newHi);
+              return newHi;
+            });
+            return ns;
+          });
           setScoreFlash(true); setTimeout(()=>setScoreFlash(false),500);
           const topRow = Math.min(...full);
           setPopups(ps => [...ps, { id:Date.now(), count, bonus:newCombo, row:topRow }]);
@@ -316,9 +341,39 @@ export default function Tetris() {
         if(isValid(b,p.shape,p.x,p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1}));
         else settle(p,b);
       } else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") {
-        const rot=rotateCW(p.shape);
-        for (const dx of [0,-1,1,-2,2]) {
-          if(isValid(b,rot,p.x+dx,p.y)){ setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx})); break; }
+        const rotShape=rotateCW(p.shape);
+        if (p.key === 'O') {
+          if(isValid(b,rotShape,p.x,p.y)){ setCurrent(prev=>({...prev,shape:rotShape,rot:(prev.rot+1)%4})); }
+        } else {
+          // simplified SRS kicks
+          const kicks = p.key === 'I' ? WALL_KICKS.I : WALL_KICKS.N;
+          let newX = p.x, newY = p.y;
+          let kicked = false;
+
+          for (let i = 0; i < kicks.length; i++) {
+            // right rotation kick values depends on current rot state, using simplified
+            // mapping for now: right/left checks
+            let kx = kicks[i][0];
+            let ky = kicks[i][1];
+
+            // adjust depending on basic rules
+            // a full proper SRS requires 4x4 matrix for each rot state
+            // to keep the code compact, we apply naive offset checks based on the kicks table
+            // and invert for some quadrants
+            const multX = (p.rot === 1 || p.rot === 2) ? -1 : 1;
+            const multY = (p.rot === 0 || p.rot === 1) ? 1 : -1;
+
+            if (isValid(b, rotShape, p.x + kx*multX, p.y + ky*multY)) {
+              newX = p.x + kx*multX;
+              newY = p.y + ky*multY;
+              kicked = true;
+              break;
+            }
+          }
+
+          if (kicked) {
+            setCurrent(prev=>({...prev,shape:rotShape,x:newX,y:newY,rot:(prev.rot+1)%4}));
+          }
         }
       } else if (e.key===" ") {
         e.preventDefault();
@@ -337,6 +392,9 @@ export default function Tetris() {
     setScore(0); setLines(0); setLevel(1); setCombo(0);
     setGameOver(false); setStarted(true); setPaused(false);
     setClearRows([]); setClearing(false); setPopups([]);
+
+    audio.initAudio();
+    audio.playBGM();
   };
 
   // ── display board ──────────────────────────────────────────────────────────
