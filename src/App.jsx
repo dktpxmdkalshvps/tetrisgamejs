@@ -1,8 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  COLS,
+  ROWS,
+  TETROMINOES,
+  PIECE_KEYS,
+  createBoard,
+  rotateCW,
+  createPiece,
+  isValid,
+  lockPiece,
+  findFullRows,
+  removeLines,
+  getGhost,
+} from "./gameLogic";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const COLS = 10;
-const ROWS = 20;
 const LINE_SCORES = [0, 100, 300, 500, 800, 800, 1200];
 const LINE_NAMES  = ["", "SINGLE", "DOUBLE", "TRIPLE", "TETRIS!", "T-SPIN SINGLE", "T-SPIN DOUBLE"];
 const T_SPIN_BONUS = 400;
@@ -18,46 +30,6 @@ const PALETTE = {
   J: { base:"#0C1E3C", mid:"#081428", deep:"#040C1C", shine:"rgba(100,160,255,0.45)", tint:"rgba(12,30,60,0.2)"  },
   L: { base:"#D8E8F0", mid:"#A8C0CC", deep:"#789098", shine:"rgba(255,255,255,0.85)", tint:"rgba(216,232,240,0.22)" },
 };
-
-const TETROMINOES = {
-  I: { shape:[[1,1,1,1]] },
-  O: { shape:[[1,1],[1,1]] },
-  T: { shape:[[0,1,0],[1,1,1]] },
-  S: { shape:[[0,1,1],[1,1,0]] },
-  Z: { shape:[[1,1,0],[0,1,1]] },
-  J: { shape:[[1,0,0],[1,1,1]] },
-  L: { shape:[[0,0,1],[1,1,1]] },
-};
-const PIECE_KEYS = Object.keys(TETROMINOES);
-
-// ── HELPERS ───────────────────────────────────────────────────────────────────
-const createBoard = () => Array.from({length:ROWS}, () => Array(COLS).fill(null));
-const rotateCW = s => s[0].map((_,ci) => s.map(r=>r[ci]).reverse());
-
-function createPiece(key) {
-  return { key, shape:[...TETROMINOES[key].shape.map(r=>[...r])],
-           x: Math.floor(COLS/2)-Math.ceil(TETROMINOES[key].shape[0].length/2), y:0 };
-}
-function isValid(board, shape, x, y) {
-  for (let r=0;r<shape.length;r++) for (let c=0;c<shape[r].length;c++) {
-    if (!shape[r][c]) continue;
-    const nr=r+y, nc=c+x;
-    if (nr<0||nr>=ROWS||nc<0||nc>=COLS||board[nr][nc]) return false;
-  } return true;
-}
-function lockPiece(board, piece) {
-  const b=board.map(r=>[...r]);
-  piece.shape.forEach((row,r)=>row.forEach((cell,c)=>{ if(cell) b[piece.y+r][piece.x+c]=piece.key; }));
-  return b;
-}
-function findFullRows(board) { return board.reduce((a,row,i)=>{if(row.every(c=>c))a.push(i);return a;},[]);}
-function removeLines(board,rows) {
-  const kept=board.filter((_,i)=>!rows.includes(i));
-  return [...Array.from({length:rows.length},()=>Array(COLS).fill(null)),...kept];
-}
-function getGhost(board,piece) {
-  let g={...piece}; while(isValid(board,g.shape,g.x,g.y+1)) g={...g,y:g.y+1}; return g;
-}
 
 // ── GLASS BUBBLE TILE ─────────────────────────────────────────────────────────
 // SVG defs — 각 색상별 그라디언트를 정의
