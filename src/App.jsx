@@ -190,26 +190,6 @@ function MiniTile({ cx, cy, tileKey, size=22 }) {
 }
 
 // ── HOLD & NEXT PIECE PREVIEWS ────────────────────────────────────────────────
-function HoldPreview({ piece }) {
-  const SZ=24, maxW=4, maxH=2;
-  const W=maxW*SZ, H=(maxH+0.5)*SZ;
-  return (
-    <svg width={W} height={H} style={{display:"block",margin:"0 auto",overflow:"visible"}}>
-      <SvgDefs/>
-      {piece && piece.shape.map((row,ri)=>row.map((cell,ci)=>{
-        if (!cell) return null;
-        const offX=Math.floor((maxW-piece.shape[0].length)/2);
-        const offY=Math.floor((maxH-piece.shape.length)/2);
-        return (
-          <MiniTile key={`${ri}-${ci}`}
-            cx={(ci+offX)*SZ} cy={(ri+offY)*SZ}
-            tileKey={piece.key} size={SZ}/>
-        );
-      }))}
-    </svg>
-  );
-}
-
 function NextPreview({ piece }) {
   const SZ=24, maxW=4, maxH=2;
   if (!piece) return <div style={{height:70}}/>;
