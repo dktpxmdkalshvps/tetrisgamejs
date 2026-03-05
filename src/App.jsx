@@ -126,9 +126,9 @@ function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size }) {
 
   if (ghost) return (
     <g>
-      {/* 프레임 */}
+      <rect x={bx} y={by} width={inner} height={inner} fill={p.base} opacity={0.15} rx={cr}/>
       <rect x={bx} y={by} width={inner} height={inner} fill="none"
-        stroke="rgba(255,255,255,0.45)" strokeWidth={2} rx={cr}/>
+        stroke={p.base} strokeWidth={2} opacity={0.8} rx={cr}/>
     </g>
   );
 
@@ -174,7 +174,6 @@ function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size }) {
 
 // 미니 프리뷰용 타일 (Next 패널)
 function MiniTile({ cx, cy, tileKey, size=22 }) {
-  const p = PALETTE[tileKey];
   const pad=1, inner=size-pad*2, cr=3;
   const cx2=cx+size/2, cy2=cy+size/2, br=inner*0.38;
   return (
@@ -230,12 +229,12 @@ function NextPreview({ piece }) {
 }
 
 // ── UI COMPONENTS ─────────────────────────────────────────────────────────────
-function Card({ children, accent, glow, style={} }) {
-  const col = accent||"rgba(180,210,220,0.3)";
+function Card({ children, accent, glow, style={}, isDark=false }) {
+  const col = accent||(isDark?"rgba(60,100,120,0.3)":"rgba(180,210,220,0.3)");
   return (
     <div style={{
-      background:"rgba(255,255,255,0.55)",
-      border:`1px solid ${glow?col:"rgba(180,210,220,0.5)"}`,
+      background:isDark?"rgba(20,30,40,0.75)":"rgba(255,255,255,0.55)",
+      border:`1px solid ${glow?col:(isDark?"rgba(80,100,120,0.5)":"rgba(180,210,220,0.5)")}`,
       borderRadius:10,
       padding:"10px 14px",
       backdropFilter:"blur(8px)",
@@ -250,79 +249,79 @@ function Card({ children, accent, glow, style={} }) {
   );
 }
 
-function Label({ children }) {
-  return <div style={{fontSize:9,letterSpacing:4,color:"rgba(60,100,110,0.5)",marginBottom:5,textTransform:"uppercase"}}>{children}</div>;
+function Label({ children, isDark=false }) {
+  return <div style={{fontSize:9,letterSpacing:4,color:isDark?"#88AACC":"rgba(60,100,110,0.5)",marginBottom:5,textTransform:"uppercase"}}>{children}</div>;
 }
 
-function BigNum({ value, color="#1A5060", size=22, flash=false }) {
+function BigNum({ value, color="#1A5060", size=22, flash=false, isDark=false }) {
   return (
     <div style={{
-      fontSize:size, fontWeight:900, letterSpacing:2, color,
+      fontSize:size, fontWeight:900, letterSpacing:2, color:isDark&&color==="#1A5060"?"#88DDEE":color,
       fontFamily:"'Courier New',monospace",
-      textShadow:`0 1px 0 rgba(255,255,255,0.8)`,
+      textShadow:isDark?"0 1px 0 rgba(0,0,0,0.8)":`0 1px 0 rgba(255,255,255,0.8)`,
       animation:flash?"scoreJump 0.4s ease":"none",
     }}>{value}</div>
   );
 }
 
-function LevelBar({ lines, level }) {
+function LevelBar({ lines, level, isDark=false }) {
   const pct=(lines%10)/10*100;
   const cols=["#3AACAC","#2A8A8A","#C8B878","#8AAAB8","#5A8080","#4A7090"];
   const col=cols[(level-1)%cols.length];
   return (
-    <Card>
-      <Label>LEVEL</Label>
-      <BigNum value={String(level).padStart(2,"0")} color={col} size={28}/>
-      <div style={{marginTop:8,height:6,background:"rgba(0,80,100,0.1)",borderRadius:3,overflow:"hidden"}}>
+    <Card isDark={isDark}>
+      <Label isDark={isDark}>LEVEL</Label>
+      <BigNum value={String(level).padStart(2,"0")} color={col} size={28} isDark={isDark}/>
+      <div style={{marginTop:8,height:6,background:isDark?"rgba(255,255,255,0.1)":"rgba(0,80,100,0.1)",borderRadius:3,overflow:"hidden"}}>
         <div style={{height:"100%",width:`${pct}%`,background:col,borderRadius:3,transition:"width 0.3s ease",opacity:0.8}}/>
       </div>
       <div style={{display:"flex",gap:3,marginTop:5}}>
         {Array.from({length:10},(_,i)=>(
           <div key={i} style={{
             flex:1,height:3,borderRadius:2,
-            background:i<lines%10?col:"rgba(0,80,100,0.12)",
+            background:i<lines%10?col:(isDark?"rgba(255,255,255,0.12)":"rgba(0,80,100,0.12)"),
             transition:"all 0.2s",
           }}/>
         ))}
       </div>
-      <div style={{fontSize:9,color:"rgba(60,100,110,0.45)",marginTop:4,letterSpacing:2}}>
+      <div style={{fontSize:9,color:isDark?"rgba(200,220,230,0.45)":"rgba(60,100,110,0.45)",marginTop:4,letterSpacing:2}}>
         {10-lines%10} to next
       </div>
     </Card>
   );
 }
 
-function ControlsCard() {
+function ControlsCard({ isDark=false }) {
   const keys=[["← →","이동"],["↑  Z","회전"],["↓","소프트"],["SPC","하드 드롭"],["C","홀드"],["ESC","일시정지"]];
   return (
-    <Card>
-      <Label>CONTROLS</Label>
+    <Card isDark={isDark}>
+      <Label isDark={isDark}>CONTROLS</Label>
       {keys.map(([k,v])=>(
         <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
           <kbd style={{
-            background:"rgba(255,255,255,0.7)",border:"1px solid rgba(100,160,180,0.3)",
+            background:isDark?"rgba(0,0,0,0.4)":"rgba(255,255,255,0.7)",border:isDark?"1px solid rgba(255,255,255,0.2)":"1px solid rgba(100,160,180,0.3)",
             borderRadius:3,padding:"1px 7px",fontSize:9,
-            color:"#2A7080",fontFamily:"'Courier New',monospace",letterSpacing:1,
-            boxShadow:"0 1px 0 rgba(0,0,0,0.1)",
+            color:isDark?"#AADDFF":"#2A7080",fontFamily:"'Courier New',monospace",letterSpacing:1,
+            boxShadow:isDark?"none":"0 1px 0 rgba(0,0,0,0.1)",
           }}>{k}</kbd>
-          <span style={{fontSize:9,color:"rgba(60,100,110,0.45)",letterSpacing:1}}>{v}</span>
+          <span style={{fontSize:9,color:isDark?"rgba(200,220,230,0.45)":"rgba(60,100,110,0.45)",letterSpacing:1}}>{v}</span>
         </div>
       ))}
     </Card>
   );
 }
 
-function ScoringCard() {
+function ScoringCard({ isDark=false }) {
   return (
-    <Card>
-      <Label>SCORING</Label>
+    <Card isDark={isDark}>
+      <Label isDark={isDark}>SCORING</Label>
       {[["1-LINE","100"],["2-LINE","300"],["3-LINE","500"],["TETRIS","800"]].map(([k,v])=>(
         <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-          <span style={{fontSize:9,color:k==="TETRIS"?"#A07020":"rgba(60,100,110,0.5)",letterSpacing:2}}>{k}</span>
-          <span style={{fontSize:9,color:"rgba(60,100,110,0.4)",letterSpacing:1}}>{v} pts</span>
+          <span style={{fontSize:9,color:k==="TETRIS"?"#C8A030":(isDark?"rgba(200,220,230,0.5)":"rgba(60,100,110,0.5)"),letterSpacing:2}}>{k}</span>
+          <span style={{fontSize:9,color:isDark?"rgba(200,220,230,0.4)":"rgba(60,100,110,0.4)",letterSpacing:1}}>{v} pts</span>
         </div>
       ))}
-      <div style={{fontSize:8,color:"rgba(60,100,110,0.3)",marginTop:4,letterSpacing:1}}>× combo multiplier</div>
+      <div style={{fontSize:8,color:isDark?"rgba(200,220,230,0.3)":"rgba(60,100,110,0.3)",marginTop:4,letterSpacing:1}}>× combo multiplier</div>
     </Card>
   );
 }
@@ -376,6 +375,7 @@ export default function Tetris() {
   const [popups, setPopups]       = useState([]);
   const [scoreFlash, setScoreFlash] = useState(false);
   const [cellSize, setCellSize] = useState(34);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const live = useRef({});
   const bagRef = useRef([]);
@@ -401,7 +401,8 @@ export default function Tetris() {
 
   useEffect(() => {
     const handleResize = () => {
-      const newCellSize = Math.floor(window.innerHeight * 0.8 / ROWS);
+      // Adjusted calculation to provide room at the bottom for mobile touch controls
+      const newCellSize = Math.floor(Math.min((window.innerHeight * 0.7) / ROWS, window.innerWidth * 0.9 / COLS));
       setCellSize(newCellSize);
     };
     handleResize();
@@ -494,60 +495,84 @@ export default function Tetris() {
     return ()=>clearInterval(id);
   },[started,gameOver,paused,current,level,clearing,settle]);
 
+  const moveLeft = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    if(isValid(b,p.shape,p.x-1,p.y)) {
+      setCurrent(prev=>({...prev,x:prev.x-1}));
+      lastMoveWasRotation.current = false;
+    }
+  }, []);
+
+  const moveRight = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    if(isValid(b,p.shape,p.x+1,p.y)) {
+      setCurrent(prev=>({...prev,x:prev.x+1}));
+      lastMoveWasRotation.current = false;
+    }
+  }, []);
+
+  const moveDown = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    if(isValid(b,p.shape,p.x,p.y+1)) {
+      setCurrent(prev=>({...prev,y:prev.y+1}));
+      lastMoveWasRotation.current = false;
+    } else settle(p,b);
+  }, [settle]);
+
+  const rotate = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    const rot=rotateCW(p.shape);
+    for (const dx of [0,-1,1,-2,2]) {
+      if(isValid(b,rot,p.x+dx,p.y)){
+        setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));
+        lastMoveWasRotation.current = true;
+        break;
+      }
+    }
+  }, []);
+
+  const hardDrop = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+    if (pa||cl||!p) return;
+    let gy=p.y; while(isValid(b,p.shape,p.x,gy+1)) gy++;
+    settle({...p,y:gy},b);
+  }, [settle]);
+
+  const holdPiece = useCallback(() => {
+    const {paused:pa,current:p,board:b,clearing:cl,heldPiece:h,hasSwapped:hs}=live.current;
+    if (pa||cl||!p||hs) return;
+    setHasSwapped(true);
+    if (h) {
+      const newCurrent = { ...h, x: Math.floor(COLS/2)-Math.ceil(h.shape[0].length/2), y: 0 };
+      const newHeld = { ...p, x: 0, y: 0 };
+      if (isValid(b, newCurrent.shape, newCurrent.x, newCurrent.y)) {
+        setCurrent(newCurrent);
+        setHeldPiece(newHeld);
+      }
+    } else {
+      setHeldPiece({ ...p, x: 0, y: 0 });
+      spawnPiece(b);
+    }
+  }, [spawnPiece]);
+
   useEffect(()=>{
     if (!started||gameOver) return;
     const onKey=e=>{
-      const {paused:pa,current:p,board:b,clearing:cl,heldPiece:h,hasSwapped:hs}=live.current;
       if (e.key==="Escape"){setPaused(v=>!v);return;}
-      if (pa||cl||!p) return;
-      if (e.key==="ArrowLeft") {
-        if(isValid(b,p.shape,p.x-1,p.y)) {
-          setCurrent(prev=>({...prev,x:prev.x-1}));
-          lastMoveWasRotation.current = false;
-        }
-      }
-      else if (e.key==="ArrowRight") {
-        if(isValid(b,p.shape,p.x+1,p.y)) {
-          setCurrent(prev=>({...prev,x:prev.x+1}));
-          lastMoveWasRotation.current = false;
-        }
-      }
-      else if (e.key==="ArrowDown") {
-        if(isValid(b,p.shape,p.x,p.y+1)) {
-          setCurrent(prev=>({...prev,y:prev.y+1}));
-          lastMoveWasRotation.current = false;
-        } else settle(p,b);
-      } else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") {
-        const rot=rotateCW(p.shape);
-        for (const dx of [0,-1,1,-2,2]) {
-          if(isValid(b,rot,p.x+dx,p.y)){
-            setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));
-            lastMoveWasRotation.current = true;
-            break;
-          }
-        }
-      } else if (e.key===" ") {
-        e.preventDefault();
-        let gy=p.y; while(isValid(b,p.shape,p.x,gy+1)) gy++;
-        settle({...p,y:gy},b);
-      } else if ((e.key==="c"||e.key==="C")&&!hs) {
-        setHasSwapped(true);
-        if (h) {
-          const newCurrent = { ...h, x: Math.floor(COLS/2)-Math.ceil(h.shape[0].length/2), y: 0 };
-          const newHeld = { ...p, x: 0, y: 0 };
-          if (isValid(b, newCurrent.shape, newCurrent.x, newCurrent.y)) {
-            setCurrent(newCurrent);
-            setHeldPiece(newHeld);
-          }
-        } else {
-          setHeldPiece({ ...p, x: 0, y: 0 });
-          spawnPiece(b);
-        }
-      }
+      if (e.key==="ArrowLeft") moveLeft();
+      else if (e.key==="ArrowRight") moveRight();
+      else if (e.key==="ArrowDown") moveDown();
+      else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") rotate();
+      else if (e.key===" ") { e.preventDefault(); hardDrop(); }
+      else if (e.key==="c"||e.key==="C") holdPiece();
     };
     window.addEventListener("keydown",onKey);
     return ()=>window.removeEventListener("keydown",onKey);
-  },[started,gameOver,settle,spawnPiece]);
+  },[started,gameOver,moveLeft,moveRight,moveDown,rotate,hardDrop,holdPiece]);
 
   const startGame=()=>{
     fillBag();
@@ -581,11 +606,15 @@ export default function Tetris() {
   return (
     <div style={{
       minHeight:"100vh",
-      background:"linear-gradient(145deg,#E8F2F5 0%,#D0E8EC 35%,#E4EEF0 65%,#F0EBE0 100%)",
+      background:isDarkMode?"linear-gradient(145deg, #1A2228, #182838, #151A22, #0A121A)":"linear-gradient(145deg,#E8F2F5 0%,#D0E8EC 35%,#E4EEF0 65%,#F0EBE0 100%)",
+      backgroundSize:"400% 400%",
+      animation:"bgDrift 15s ease infinite",
       display:"flex",alignItems:"center",justifyContent:"center",
       fontFamily:"'Courier New',monospace",
+      position:"relative",
     }}>
       <style>{`
+        @keyframes bgDrift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         @keyframes popFloat{0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}60%{opacity:1;transform:translateX(-50%) translateY(-32px) scale(1.08)}100%{opacity:0;transform:translateX(-50%) translateY(-56px) scale(0.9)}}
         @keyframes scoreJump{0%,100%{transform:scale(1)}40%{transform:scale(1.2)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -595,55 +624,61 @@ export default function Tetris() {
           font-family:'Courier New',monospace;font-size:11px;
           letter-spacing:4px;padding:10px 28px;text-transform:uppercase;
           transition:all 0.2s;
-          background:rgba(255,255,255,0.7);
-          border:1px solid rgba(100,180,190,0.5);
-          color:#2A7080;
+          background:${isDarkMode?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.7)"};
+          border:1px solid ${isDarkMode?"rgba(255,255,255,0.2)":"rgba(100,180,190,0.5)"};
+          color:${isDarkMode?"#AADDFF":"#2A7080"};
           box-shadow:0 2px 12px rgba(0,100,120,0.15),inset 0 1px 0 rgba(255,255,255,0.9);
           backdrop-filter:blur(8px);
         }
         .glass-btn:hover{
-          background:rgba(255,255,255,0.9);
+          background:${isDarkMode?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.9)"};
           box-shadow:0 4px 20px rgba(0,100,120,0.25),inset 0 1px 0 rgba(255,255,255,1);
           transform:translateY(-1px);
         }
+        .mobile-controls {
+          display: none !important;
+        }
+        @media (max-width: 768px) {
+          .mobile-controls {
+            display: flex !important;
+          }
+        }
       `}</style>
+
+      {/* Dark Mode Toggle */}
+      <button className="glass-btn" onClick={() => setIsDarkMode(p => !p)} style={{position: 'absolute', top: 20, right: 20, zIndex: 100}}>
+        {isDarkMode ? "☀ LIGHT" : "🌙 DARK"}
+      </button>
 
       <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
 
         {/* ══ LEFT PANEL ══ */}
         <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
-          {/* Hold Piece */}
-          <Card accent={heldPiece?PALETTE[heldPiece.key]?.base:"transparent"} glow={!!heldPiece}>
-            <Label>HOLD</Label>
-            <HoldPreview piece={heldPiece} />
-          </Card>
-
           {/* Hi-Score */}
-          <Card accent="#C8A030" glow={newHi}>
-            <Label>HI-SCORE</Label>
-            <BigNum value={hiScore.toString().padStart(8,"0")} color={newHi?"#8A6010":"rgba(60,100,110,0.4)"} size={14}/>
+          <Card accent="#C8A030" glow={newHi} isDark={isDarkMode}>
+            <Label isDark={isDarkMode}>HI-SCORE</Label>
+            <BigNum value={hiScore.toString().padStart(8,"0")} color={newHi?"#8A6010":"rgba(60,100,110,0.4)"} size={14} isDark={isDarkMode}/>
             {newHi&&<div style={{fontSize:8,color:"#A07020",letterSpacing:3,marginTop:3}}>✦ NEW RECORD</div>}
           </Card>
 
           {/* Score */}
-          <Card glow={scoreFlash} accent="rgba(0,150,180,0.5)">
-            <Label>SCORE</Label>
-            <BigNum value={score.toString().padStart(8,"0")} color="#1A6070" size={17} flash={scoreFlash}/>
+          <Card glow={scoreFlash} accent="rgba(0,150,180,0.5)" isDark={isDarkMode}>
+            <Label isDark={isDarkMode}>SCORE</Label>
+            <BigNum value={score.toString().padStart(8,"0")} color="#1A6070" size={17} flash={scoreFlash} isDark={isDarkMode}/>
           </Card>
 
           {/* Lines */}
-          <Card>
-            <Label>LINES</Label>
-.
-            <BigNum value={lines.toString().padStart(4,"0")} color="#2A8A70"/>
+          <Card isDark={isDarkMode}>
+            <Label isDark={isDarkMode}>LINES</Label>
+            <BigNum value={lines.toString().padStart(4,"0")} color="#2A8A70" isDark={isDarkMode}/>
           </Card>
 
           {/* Combo */}
-          <Card accent={comboActive?"rgba(160,120,0,0.4)":undefined} glow={comboActive}>
-            <Label>COMBO</Label>
+          <Card accent={comboActive?"rgba(160,120,0,0.4)":undefined} glow={comboActive} isDark={isDarkMode}>
+            <Label isDark={isDarkMode}>COMBO</Label>
             <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-              <BigNum value={combo} color={comboActive?"#8A6010":"rgba(60,100,110,0.2)"} size={32}/>
+              <BigNum value={combo} color={comboActive?"#8A6010":"rgba(60,100,110,0.2)"} size={32} isDark={isDarkMode}/>
               {comboActive&&<span style={{fontSize:11,color:"#8A6010",letterSpacing:2}}>×{combo}</span>}
             </div>
             {comboActive&&<div style={{fontSize:8,color:"#A07030",letterSpacing:2,marginTop:2}}>MULTIPLIER ACTIVE</div>}
@@ -658,15 +693,15 @@ export default function Tetris() {
           {/* 타이틀 */}
           <div style={{
             textAlign:"center",fontSize:11,letterSpacing:10,
-            color:"rgba(40,100,110,0.35)",marginBottom:8,
+            color:isDarkMode?"rgba(200,220,230,0.35)":"rgba(40,100,110,0.35)",marginBottom:8,
             fontWeight:700,
           }}>TETRIS</div>
 
           {/* 보드 컨테이너 */}
           <div style={{
             position:"relative",
-            background:"rgba(255,255,255,0.35)",
-            border:"1px solid rgba(180,220,228,0.6)",
+            background:isDarkMode?"rgba(0,0,0,0.4)":"rgba(255,255,255,0.35)",
+            border:`1px solid ${isDarkMode?"rgba(80,100,120,0.5)":"rgba(180,220,228,0.6)"}`,
             borderRadius:8,
             boxShadow:"0 8px 32px rgba(0,80,100,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",
             overflow:"hidden",
@@ -709,7 +744,7 @@ export default function Tetris() {
             {(!started||gameOver||paused)&&(
               <div style={{
                 position:"absolute",inset:0,
-                background:"rgba(230,242,245,0.88)",
+                background:isDarkMode?"rgba(20,30,40,0.88)":"rgba(230,242,245,0.88)",
                 backdropFilter:"blur(12px)",
                 display:"flex",flexDirection:"column",alignItems:"center",
                 justifyContent:"center",gap:16,
@@ -717,34 +752,34 @@ export default function Tetris() {
               }}>
                 {gameOver?(
                   <>
-                    <div style={{fontSize:9,letterSpacing:6,color:"rgba(60,100,110,0.4)"}}>— GAME OVER —</div>
+                    <div style={{fontSize:9,letterSpacing:6,color:isDarkMode?"rgba(200,220,230,0.4)":"rgba(60,100,110,0.4)"}}>— GAME OVER —</div>
                     <div style={{
-                      fontSize:38,fontWeight:900,color:"#1A5060",letterSpacing:4,
-                      textShadow:"0 2px 0 rgba(255,255,255,0.9),0 4px 12px rgba(0,80,100,0.2)",
+                      fontSize:38,fontWeight:900,color:isDarkMode?"#88DDEE":"#1A5060",letterSpacing:4,
+                      textShadow:isDarkMode?"0 2px 0 rgba(0,0,0,0.9),0 4px 12px rgba(0,0,0,0.5)":"0 2px 0 rgba(255,255,255,0.9),0 4px 12px rgba(0,80,100,0.2)",
                     }}>OVER</div>
-                    <div style={{fontSize:9,color:"rgba(60,100,110,0.4)",letterSpacing:3}}>FINAL SCORE</div>
+                    <div style={{fontSize:9,color:isDarkMode?"rgba(200,220,230,0.4)":"rgba(60,100,110,0.4)",letterSpacing:3}}>FINAL SCORE</div>
                     <div style={{
                       fontSize:26,fontWeight:900,color:"#8A6010",
-                      textShadow:"0 2px 0 rgba(255,255,255,0.9)",
+                      textShadow:isDarkMode?"0 2px 0 rgba(0,0,0,0.9)":"0 2px 0 rgba(255,255,255,0.9)",
                     }}>{score.toString().padStart(8,"0")}</div>
                     {newHi&&<div style={{fontSize:9,color:"#A07020",letterSpacing:4}}>✦ NEW HI-SCORE ✦</div>}
                     <button className="glass-btn" onClick={startGame} style={{marginTop:6}}>RETRY</button>
                   </>
                 ):paused?(
                   <>
-                    <div style={{fontSize:24,fontWeight:900,color:"#1A6070",letterSpacing:8,
-                      textShadow:"0 2px 0 rgba(255,255,255,0.9)"}}>PAUSED</div>
+                    <div style={{fontSize:24,fontWeight:900,color:isDarkMode?"#88DDEE":"#1A6070",letterSpacing:8,
+                      textShadow:isDarkMode?"0 2px 0 rgba(0,0,0,0.9)":"0 2px 0 rgba(255,255,255,0.9)"}}>PAUSED</div>
                     <button className="glass-btn" onClick={()=>setPaused(false)}>RESUME</button>
                   </>
                 ):(
                   <>
-                    <div style={{fontSize:9,letterSpacing:8,color:"rgba(60,100,110,0.4)"}}>— ARCADE EDITION —</div>
+                    <div style={{fontSize:9,letterSpacing:8,color:isDarkMode?"rgba(200,220,230,0.4)":"rgba(60,100,110,0.4)"}}>— ARCADE EDITION —</div>
                     <div style={{
                       fontSize:46,fontWeight:900,letterSpacing:4,
                       background:"linear-gradient(135deg,#2A9090,#5BC4C4 40%,#A09050 70%,#C8B878)",
                       WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",
                       textShadow:"none",
-                      filter:"drop-shadow(0 3px 6px rgba(0,100,120,0.2))",
+                      filter:isDarkMode?"drop-shadow(0 3px 6px rgba(0,0,0,0.5))":"drop-shadow(0 3px 6px rgba(0,100,120,0.2))",
                     }}>TETRIS</div>
                     {/* 샘플 타일 장식 */}
                     <div style={{display:"flex",gap:4,margin:"4px 0"}}>
@@ -767,23 +802,23 @@ export default function Tetris() {
         <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
           {/* NEXT PIECE */}
-          <Card accent={next?PALETTE[next.key]?.base:"transparent"} glow={!!next}>
-            <Label>NEXT PIECE</Label>
+          <Card accent={next?PALETTE[next.key]?.base:"transparent"} glow={!!next} isDark={isDarkMode}>
+            <Label isDark={isDarkMode}>NEXT PIECE</Label>
             <NextPreview piece={next}/>
             {next&&(
               <div style={{
                 textAlign:"center",fontSize:9,letterSpacing:4,marginTop:4,
-                color:PALETTE[next.key]?.mid||"#2A7080",
+                color:PALETTE[next.key]?.mid||(isDarkMode?"#AADDFF":"#2A7080"),
               }}>{next.key}-PIECE</div>
             )}
           </Card>
 
           {/* Level */}
-          <LevelBar lines={lines} level={level}/>
+          <LevelBar lines={lines} level={level} isDark={isDarkMode}/>
 
           {/* Speed */}
-          <Card>
-            <Label>SPEED</Label>
+          <Card isDark={isDarkMode}>
+            <Label isDark={isDarkMode}>SPEED</Label>
             <div style={{display:"flex",gap:3,marginTop:4}}>
               {Array.from({length:10},(_,i)=>{
                 const on=i<Math.min(level,10);
@@ -791,18 +826,18 @@ export default function Tetris() {
                 return (
                   <div key={i} style={{
                     flex:1,height:20,borderRadius:3,
-                    background:on?cols[i]:"rgba(0,80,100,0.08)",
+                    background:on?cols[i]:(isDarkMode?"rgba(255,255,255,0.08)":"rgba(0,80,100,0.08)"),
                     opacity:on?0.85:1,
                     boxShadow:on?`0 1px 4px ${cols[i]}66`:"none",
                     transition:"all 0.3s",
-                    border:on?"none":"1px solid rgba(0,80,100,0.1)",
+                    border:on?"none":`1px solid ${isDarkMode?"rgba(255,255,255,0.1)":"rgba(0,80,100,0.1)"}`,
                   }}/>
                 );
               })}
             </div>
           </Card>
 
-          <ScoringCard/>
+          <ScoringCard isDark={isDarkMode}/>
 
           <div style={{flex:1}}/>
 
@@ -815,6 +850,32 @@ export default function Tetris() {
           )}
         </div>
       </div>
+
+      {/* Mobile Touch Controls */}
+      {started && !gameOver && !paused && (
+        <div style={{
+          position: "fixed", bottom: 10, left: "50%", transform: "translateX(-50%)",
+          display: "flex", gap: 30, zIndex: 50, padding: "10px",
+          background: "rgba(255,255,255,0.15)", borderRadius: 30, backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.3)"
+        }} className="mobile-controls">
+          {/* Action Buttons */}
+          <div style={{display: "flex", flexDirection: "column", gap: 10, justifyContent: "center"}}>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); holdPiece();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10}}>HLD</button>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); hardDrop();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10}}>DRP</button>
+          </div>
+
+          {/* D-Pad */}
+          <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "center", justifyContent: "center"}}>
+            <div/>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); rotate();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>↻</button>
+            <div/>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveLeft();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>←</button>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveDown();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>↓</button>
+            <button className="glass-btn" onClick={(e)=>{e.preventDefault(); moveRight();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55}}>→</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
