@@ -3,9 +3,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const COLS = 10;
 const ROWS = 20;
-const CELL = 34;
-const LINE_SCORES = [0, 100, 300, 500, 800];
-const LINE_NAMES  = ["", "SINGLE", "DOUBLE", "TRIPLE", "TETRIS!"];
+const LINE_SCORES = [0, 100, 300, 500, 800, 800, 1200];
+const LINE_NAMES  = ["", "SINGLE", "DOUBLE", "TRIPLE", "TETRIS!", "T-SPIN SINGLE", "T-SPIN DOUBLE"];
+const T_SPIN_BONUS = 400;
 const CLEAR_MS    = 340;
 
 // 이미지의 유리 버블 타일 색상 팔레트
@@ -34,8 +34,7 @@ const PIECE_KEYS = Object.keys(TETROMINOES);
 const createBoard = () => Array.from({length:ROWS}, () => Array(COLS).fill(null));
 const rotateCW = s => s[0].map((_,ci) => s.map(r=>r[ci]).reverse());
 
-function randomPiece() {
-  const key = PIECE_KEYS[Math.floor(Math.random()*PIECE_KEYS.length)];
+function createPiece(key) {
   return { key, shape:[...TETROMINOES[key].shape.map(r=>[...r])],
            x: Math.floor(COLS/2)-Math.ceil(TETROMINOES[key].shape[0].length/2), y:0 };
 }
@@ -114,7 +113,7 @@ function SvgDefs() {
 }
 
 // 유리 버블 타일 한 칸
-function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size=CELL }) {
+function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size }) {
   const p = PALETTE[tileKey] || PALETTE.I;
   const pad = 1.5;
   const inner = size - pad*2;
@@ -126,14 +125,10 @@ function GlassTile({ cx, cy, tileKey, ghost=false, flash=false, size=CELL }) {
   );
 
   if (ghost) return (
-    <g opacity={0.38}>
+    <g>
       {/* 프레임 */}
-      <rect x={bx} y={by} width={inner} height={inner} fill="rgba(255,255,255,0.05)"
-        stroke="rgba(255,255,255,0.35)" strokeWidth={1} rx={cr}/>
-      {/* 버블 아웃라인 */}
-      <ellipse cx={cx+size/2} cy={cy+size/2}
-        rx={inner*0.38} ry={inner*0.38}
-        fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1}/>
+      <rect x={bx} y={by} width={inner} height={inner} fill="none"
+        stroke="rgba(255,255,255,0.45)" strokeWidth={2} rx={cr}/>
     </g>
   );
 
@@ -195,7 +190,27 @@ function MiniTile({ cx, cy, tileKey, size=22 }) {
   );
 }
 
-// ── NEXT PIECE PREVIEW ────────────────────────────────────────────────────────
+// ── HOLD & NEXT PIECE PREVIEWS ────────────────────────────────────────────────
+function HoldPreview({ piece }) {
+  const SZ=24, maxW=4, maxH=2;
+  const W=maxW*SZ, H=(maxH+0.5)*SZ;
+  return (
+    <svg width={W} height={H} style={{display:"block",margin:"0 auto",overflow:"visible"}}>
+      <SvgDefs/>
+      {piece && piece.shape.map((row,ri)=>row.map((cell,ci)=>{
+        if (!cell) return null;
+        const offX=Math.floor((maxW-piece.shape[0].length)/2);
+        const offY=Math.floor((maxH-piece.shape.length)/2);
+        return (
+          <MiniTile key={`${ri}-${ci}`}
+            cx={(ci+offX)*SZ} cy={(ri+offY)*SZ}
+            tileKey={piece.key} size={SZ}/>
+        );
+      }))}
+    </svg>
+  );
+}
+
 function NextPreview({ piece }) {
   const SZ=24, maxW=4, maxH=2;
   if (!piece) return <div style={{height:70}}/>;
@@ -278,7 +293,7 @@ function LevelBar({ lines, level }) {
 }
 
 function ControlsCard() {
-  const keys=[["← →","이동"],["↑  Z","회전"],["↓","소프트"],["SPC","하드 드롭"],["ESC","일시정지"]];
+  const keys=[["← →","이동"],["↑  Z","회전"],["↓","소프트"],["SPC","하드 드롭"],["C","홀드"],["ESC","일시정지"]];
   return (
     <Card>
       <Label>CONTROLS</Label>
@@ -313,18 +328,18 @@ function ScoringCard() {
 }
 
 // ── SCORE POPUP ───────────────────────────────────────────────────────────────
-function ScorePopup({ popups }) {
+function ScorePopup({ popups, cellSize }) {
   return (
     <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:20}}>
       {popups.map(p=>(
         <div key={p.id} style={{
-          position:"absolute",left:"50%",top:p.row*CELL,
+          position:"absolute",left:"50%",top:p.row*cellSize,
           transform:"translateX(-50%)",
-          color:p.count===4?"#8A6010":"#2A6070",
-          fontSize:p.count===4?18:13,
+          color:p.tSpin ? "#A040A0" : (p.count===4?"#8A6010":"#2A6070"),
+          fontSize:p.tSpin ? 16 : (p.count===4?18:13),
           fontFamily:"'Courier New',monospace",
           fontWeight:900,letterSpacing:3,
-          textShadow:p.count===4?"0 2px 8px rgba(160,120,0,0.4)":"0 2px 6px rgba(0,100,120,0.3)",
+          textShadow:p.tSpin ? "0 2px 8px rgba(160,64,160,0.4)" : (p.count===4?"0 2px 8px rgba(160,120,0,0.4)":"0 2px 6px rgba(0,100,120,0.3)"),
           animation:"popFloat 0.9s ease-out forwards",
           whiteSpace:"nowrap",
           background:"rgba(255,255,255,0.75)",
@@ -332,7 +347,8 @@ function ScorePopup({ popups }) {
           backdropFilter:"blur(4px)",
           border:"1px solid rgba(255,255,255,0.9)",
         }}>
-          {p.count===4?"✦ TETRIS! ✦":LINE_NAMES[p.count]}
+          {p.tSpin && `T-SPIN ${LINE_NAMES[p.count]}`}
+          {!p.tSpin && (p.count===4?"✦ TETRIS! ✦":LINE_NAMES[p.count])}
           {p.bonus>1&&<span style={{fontSize:9,marginLeft:6,color:"#8A6010"}}>×{p.bonus}</span>}
         </div>
       ))}
@@ -345,6 +361,8 @@ export default function Tetris() {
   const [board, setBoard]         = useState(createBoard());
   const [current, setCurrent]     = useState(null);
   const [next, setNext]           = useState(null);
+  const [heldPiece, setHeldPiece] = useState(null);
+  const [hasSwapped, setHasSwapped] = useState(false);
   const [score, setScore]         = useState(0);
   const [hiScore, setHiScore]     = useState(0);
   const [lines, setLines]         = useState(0);
@@ -357,23 +375,75 @@ export default function Tetris() {
   const [clearing, setClearing]   = useState(false);
   const [popups, setPopups]       = useState([]);
   const [scoreFlash, setScoreFlash] = useState(false);
+  const [cellSize, setCellSize] = useState(34);
 
   const live = useRef({});
-  live.current = {board,current,gameOver,paused,clearing,combo};
+  const bagRef = useRef([]);
+  const lastMoveWasRotation = useRef(false);
+
+  const fillBag = useCallback(() => {
+    let newBag = [...PIECE_KEYS];
+    for (let i = newBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newBag[i], newBag[j]] = [newBag[j], newBag[i]];
+    }
+    bagRef.current = newBag;
+  }, []);
+
+  const nextPieceFromBag = useCallback(() => {
+    if (bagRef.current.length === 0) {
+      fillBag();
+    }
+    return createPiece(bagRef.current.pop());
+  }, [fillBag]);
+
+  live.current = {board,current,gameOver,paused,clearing,combo,heldPiece,hasSwapped,lastMoveWasRotation:lastMoveWasRotation.current};
+
+  useEffect(() => {
+    const handleResize = () => {
+      const newCellSize = Math.floor(window.innerHeight * 0.8 / ROWS);
+      setCellSize(newCellSize);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const spawnPiece = useCallback((b) => {
     setNext(prev => {
-      const piece = prev||randomPiece();
+      const piece = prev||nextPieceFromBag();
       if (!isValid(b,piece.shape,piece.x,piece.y)) { setGameOver(true); return prev; }
       setCurrent(piece);
-      return randomPiece();
+      lastMoveWasRotation.current = false;
+      return nextPieceFromBag();
     });
-  }, []);
+  }, [nextPieceFromBag]);
 
   const settle = useCallback((piece, b) => {
     const locked = lockPiece(b,piece);
-    const full   = findFullRows(locked);
-    if (full.length>0) {
+    setHasSwapped(false);
+
+    let tSpin = false;
+    if (piece.key === 'T' && lastMoveWasRotation.current) {
+      const corners = [
+        [piece.y, piece.x],
+        [piece.y, piece.x + 2],
+        [piece.y + 2, piece.x],
+        [piece.y + 2, piece.x + 2]
+      ];
+      let occupiedCorners = 0;
+      corners.forEach(([y, x]) => {
+        if (y >= ROWS || x < 0 || x >= COLS || (b[y] && b[y][x])) {
+          occupiedCorners++;
+        }
+      });
+      if (occupiedCorners >= 3) {
+        tSpin = true;
+      }
+    }
+
+    const full = findFullRows(locked);
+    if (full.length > 0) {
       setClearing(true); setClearRows(full);
       setTimeout(()=>{
         const nb=removeLines(locked,full);
@@ -382,17 +452,31 @@ export default function Tetris() {
         setLines(prev=>{const nl=prev+count;setLevel(Math.floor(nl/10)+1);return nl;});
         setCombo(prev=>{
           const nc2=prev+1;
-          const pts=LINE_SCORES[count]*nc2;
+          let scoreIndex = count;
+          if (tSpin) {
+            if (count === 1) scoreIndex = 5; // T-Spin Single
+            if (count === 2) scoreIndex = 6; // T-Spin Double
+          }
+          const pts = (tSpin ? T_SPIN_BONUS : 0) + LINE_SCORES[scoreIndex] * nc2;
           setScore(s=>{const ns=s+pts;setHiScore(h=>Math.max(h,ns));return ns;});
           setScoreFlash(true); setTimeout(()=>setScoreFlash(false),500);
           const tr=Math.min(...full);
-          setPopups(ps=>[...ps,{id:Date.now(),count,bonus:nc2,row:tr}]);
+          setPopups(ps=>[...ps,{id:Date.now(),count,bonus:nc2,row:tr,tSpin}]);
           setTimeout(()=>setPopups(ps=>ps.slice(1)),1000);
           return nc2;
         });
         spawnPiece(nb);
       },CLEAR_MS);
-    } else { setBoard(locked); setCombo(0); spawnPiece(locked); }
+    } else {
+      if (tSpin) { // T-Spin with no lines cleared
+        const pts = T_SPIN_BONUS;
+        setScore(s=>{const ns=s+pts;setHiScore(h=>Math.max(h,ns));return ns;});
+        setScoreFlash(true); setTimeout(()=>setScoreFlash(false),500);
+        setPopups(ps=>[...ps,{id:Date.now(),count:0,bonus:1,row:piece.y,tSpin}]);
+        setTimeout(()=>setPopups(ps=>ps.slice(1)),1000);
+      }
+      setBoard(locked); setCombo(0); spawnPiece(locked);
+    }
   },[spawnPiece]);
 
   useEffect(()=>{
@@ -401,7 +485,10 @@ export default function Tetris() {
     const id=setInterval(()=>{
       const {current:p,board:b,gameOver:go,paused:pa,clearing:cl}=live.current;
       if (!p||go||pa||cl) return;
-      if (isValid(b,p.shape,p.x,p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1}));
+      if (isValid(b,p.shape,p.x,p.y+1)) {
+        lastMoveWasRotation.current = false;
+        setCurrent(prev=>({...prev,y:prev.y+1}));
+      }
       else settle(p,b);
     },delay);
     return ()=>clearInterval(id);
@@ -410,32 +497,67 @@ export default function Tetris() {
   useEffect(()=>{
     if (!started||gameOver) return;
     const onKey=e=>{
-      const {paused:pa,current:p,board:b,clearing:cl}=live.current;
+      const {paused:pa,current:p,board:b,clearing:cl,heldPiece:h,hasSwapped:hs}=live.current;
       if (e.key==="Escape"){setPaused(v=>!v);return;}
       if (pa||cl||!p) return;
-      if (e.key==="ArrowLeft") { if(isValid(b,p.shape,p.x-1,p.y)) setCurrent(prev=>({...prev,x:prev.x-1})); }
-      else if (e.key==="ArrowRight") { if(isValid(b,p.shape,p.x+1,p.y)) setCurrent(prev=>({...prev,x:prev.x+1})); }
+      if (e.key==="ArrowLeft") {
+        if(isValid(b,p.shape,p.x-1,p.y)) {
+          setCurrent(prev=>({...prev,x:prev.x-1}));
+          lastMoveWasRotation.current = false;
+        }
+      }
+      else if (e.key==="ArrowRight") {
+        if(isValid(b,p.shape,p.x+1,p.y)) {
+          setCurrent(prev=>({...prev,x:prev.x+1}));
+          lastMoveWasRotation.current = false;
+        }
+      }
       else if (e.key==="ArrowDown") {
-        if(isValid(b,p.shape,p.x,p.y+1)) setCurrent(prev=>({...prev,y:prev.y+1})); else settle(p,b);
+        if(isValid(b,p.shape,p.x,p.y+1)) {
+          setCurrent(prev=>({...prev,y:prev.y+1}));
+          lastMoveWasRotation.current = false;
+        } else settle(p,b);
       } else if (e.key==="ArrowUp"||e.key==="z"||e.key==="Z") {
         const rot=rotateCW(p.shape);
-        for (const dx of [0,-1,1,-2,2]) if(isValid(b,rot,p.x+dx,p.y)){setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));break;}
+        for (const dx of [0,-1,1,-2,2]) {
+          if(isValid(b,rot,p.x+dx,p.y)){
+            setCurrent(prev=>({...prev,shape:rot,x:prev.x+dx}));
+            lastMoveWasRotation.current = true;
+            break;
+          }
+        }
       } else if (e.key===" ") {
         e.preventDefault();
         let gy=p.y; while(isValid(b,p.shape,p.x,gy+1)) gy++;
         settle({...p,y:gy},b);
+      } else if ((e.key==="c"||e.key==="C")&&!hs) {
+        setHasSwapped(true);
+        if (h) {
+          const newCurrent = { ...h, x: Math.floor(COLS/2)-Math.ceil(h.shape[0].length/2), y: 0 };
+          const newHeld = { ...p, x: 0, y: 0 };
+          if (isValid(b, newCurrent.shape, newCurrent.x, newCurrent.y)) {
+            setCurrent(newCurrent);
+            setHeldPiece(newHeld);
+          }
+        } else {
+          setHeldPiece({ ...p, x: 0, y: 0 });
+          spawnPiece(b);
+        }
       }
     };
     window.addEventListener("keydown",onKey);
     return ()=>window.removeEventListener("keydown",onKey);
-  },[started,gameOver,settle]);
+  },[started,gameOver,settle,spawnPiece]);
 
   const startGame=()=>{
-    const b=createBoard(),p=randomPiece();
-    setBoard(b);setCurrent(p);setNext(randomPiece());
+    fillBag();
+    const b=createBoard();
+    const p=nextPieceFromBag();
+    setBoard(b);setCurrent(p);setNext(nextPieceFromBag());
     setScore(0);setLines(0);setLevel(1);setCombo(0);
     setGameOver(false);setStarted(true);setPaused(false);
     setClearRows([]);setClearing(false);setPopups([]);
+    setHeldPiece(null);setHasSwapped(false);
   };
 
   // build display board
@@ -452,7 +574,7 @@ export default function Tetris() {
     if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) displayBoard[nr][nc]=current.key;
   }));
 
-  const BW=COLS*CELL, BH=ROWS*CELL;
+  const BW=COLS*cellSize, BH=ROWS*cellSize;
   const newHi=score>0&&score>=hiScore;
   const comboActive=combo>1;
 
@@ -491,6 +613,12 @@ export default function Tetris() {
         {/* ══ LEFT PANEL ══ */}
         <div style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
 
+          {/* Hold Piece */}
+          <Card accent={heldPiece?PALETTE[heldPiece.key]?.base:"transparent"} glow={!!heldPiece}>
+            <Label>HOLD</Label>
+            <HoldPreview piece={heldPiece} />
+          </Card>
+
           {/* Hi-Score */}
           <Card accent="#C8A030" glow={newHi}>
             <Label>HI-SCORE</Label>
@@ -507,6 +635,7 @@ export default function Tetris() {
           {/* Lines */}
           <Card>
             <Label>LINES</Label>
+.
             <BigNum value={lines.toString().padStart(4,"0")} color="#2A8A70"/>
           </Card>
 
@@ -548,11 +677,11 @@ export default function Tetris() {
 
               {/* 그리드 라인 */}
               {Array.from({length:ROWS+1},(_,i)=>(
-                <line key={`h${i}`} x1={0} y1={i*CELL} x2={BW} y2={i*CELL}
+                <line key={`h${i}`} x1={0} y1={i*cellSize} x2={BW} y2={i*cellSize}
                   stroke="rgba(100,160,180,0.12)" strokeWidth={1}/>
               ))}
               {Array.from({length:COLS+1},(_,i)=>(
-                <line key={`v${i}`} x1={i*CELL} y1={0} x2={i*CELL} y2={BH}
+                <line key={`v${i}`} x1={i*cellSize} y1={0} x2={i*cellSize} y2={BH}
                   stroke="rgba(100,160,180,0.12)" strokeWidth={1}/>
               ))}
 
@@ -564,17 +693,17 @@ export default function Tetris() {
                 const isClearing=clearRows.includes(ri);
                 return (
                   <GlassTile key={`${ri}-${ci}`}
-                    cx={ci*CELL} cy={ri*CELL}
+                    cx={ci*cellSize} cy={ri*cellSize}
                     tileKey={key}
                     ghost={isGhost}
                     flash={isClearing}
-                    size={CELL}
+                    size={cellSize}
                   />
                 );
               }))}
             </svg>
 
-            <ScorePopup popups={popups}/>
+            <ScorePopup popups={popups} cellSize={cellSize}/>
 
             {/* 오버레이 */}
             {(!started||gameOver||paused)&&(
