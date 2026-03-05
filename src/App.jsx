@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const COLS = 10;
@@ -586,18 +586,21 @@ export default function Tetris() {
   };
 
   // build display board
-  const ghost=(current&&!gameOver&&!clearing)?getGhost(board,current):null;
-  const displayBoard=board.map(r=>[...r]);
-  if (ghost) ghost.shape.forEach((row,r)=>row.forEach((cell,c)=>{
-    if (!cell) return;
-    const nr=ghost.y+r,nc=ghost.x+c;
-    if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!displayBoard[nr][nc]) displayBoard[nr][nc]="__ghost__";
-  }));
-  if (current&&!gameOver) current.shape.forEach((row,r)=>row.forEach((cell,c)=>{
-    if (!cell) return;
-    const nr=current.y+r,nc=current.x+c;
-    if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) displayBoard[nr][nc]=current.key;
-  }));
+  const displayBoard = useMemo(() => {
+    const ghost = (current && !gameOver && !clearing) ? getGhost(board, current) : null;
+    const db = board.map(r => [...r]);
+    if (ghost) ghost.shape.forEach((row, r) => row.forEach((cell, c) => {
+      if (!cell) return;
+      const nr = ghost.y + r, nc = ghost.x + c;
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !db[nr][nc]) db[nr][nc] = "__ghost__";
+    }));
+    if (current && !gameOver) current.shape.forEach((row, r) => row.forEach((cell, c) => {
+      if (!cell) return;
+      const nr = current.y + r, nc = current.x + c;
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) db[nr][nc] = current.key;
+    }));
+    return db;
+  }, [board, current, gameOver, clearing]);
 
   const BW=COLS*cellSize, BH=ROWS*cellSize;
   const newHi=score>0&&score>=hiScore;
