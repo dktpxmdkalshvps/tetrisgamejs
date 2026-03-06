@@ -381,6 +381,9 @@ export default function Tetris() {
   const bagRef = useRef([]);
   const lastMoveWasRotation = useRef(false);
 
+  // For touch/mouse dragging
+  const dragRef = useRef({ isDragging: false, startX: 0, startY: 0, lastX: 0, lastY: 0 });
+
   const fillBag = useCallback(() => {
     let newBag = [...PIECE_KEYS];
     for (let i = newBag.length - 1; i > 0; i--) {
@@ -401,15 +404,26 @@ export default function Tetris() {
 
   useEffect(() => {
     const handleResize = () => {
-      // Adjusted calculation to provide room at the bottom for mobile touch controls
-      // We check if the screen is narrow (mobile) and give more room to controls
       const isMobile = window.innerWidth <= 768;
-      const heightMultiplier = isMobile ? 0.6 : 0.8;
-      const widthMultiplier = isMobile ? 0.95 : 0.9;
+      const mobileControlHeight = 220; // 모바일 컨트롤러가 차지할 높이
 
-      const newCellSize = Math.floor(Math.min((window.innerHeight * heightMultiplier) / ROWS, window.innerWidth * widthMultiplier / COLS));
-      setCellSize(newCellSize);
+      // 사용 가능한 높이 계산
+      const availableHeight = isMobile
+        ? window.innerHeight - mobileControlHeight - 100 // 모바일은 컨트롤러 공간 제외
+        : window.innerHeight * 0.8;
+
+      // 사용 가능한 너비 계산
+      const availableWidth = isMobile
+        ? window.innerWidth * 0.95
+        : window.innerWidth * 0.4;
+
+      const sizeByHeight = Math.floor(availableHeight / ROWS);
+      const sizeByWidth = Math.floor(availableWidth / COLS);
+
+      // 둘 중 더 작은 값으로 결정하여 화면 밖으로 나가지 않게 함
+      setCellSize(Math.min(sizeByHeight, sizeByWidth, 35));
     };
+
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -579,6 +593,46 @@ export default function Tetris() {
     return ()=>window.removeEventListener("keydown",onKey);
   },[started,gameOver,moveLeft,moveRight,moveDown,rotate,hardDrop,holdPiece]);
 
+  const handlePointerDown = (e) => {
+    if (!started || gameOver || paused || !current) return;
+    dragRef.current = {
+      isDragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY
+    };
+    e.target.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!dragRef.current.isDragging) return;
+
+    const deltaX = e.clientX - dragRef.current.lastX;
+    const deltaY = e.clientY - dragRef.current.lastY;
+
+    // 가로 이동 임계값 (셀 크기 정도 이동하면 한 칸 이동)
+    const thresholdX = cellSize * 0.8;
+    // 세로 이동 임계값
+    const thresholdY = cellSize * 0.8;
+
+    if (Math.abs(deltaX) > thresholdX) {
+      if (deltaX > 0) moveRight();
+      else moveLeft();
+      dragRef.current.lastX = e.clientX;
+    }
+
+    if (deltaY > thresholdY) {
+      moveDown();
+      dragRef.current.lastY = e.clientY;
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    dragRef.current.isDragging = false;
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
   const startGame=()=>{
     fillBag();
     const b=createBoard();
@@ -610,15 +664,21 @@ export default function Tetris() {
 
   return (
     <div style={{
-      minHeight:"100vh",
+      height:"100dvh", // 실제 모바일 뷰포트 높이 반영
+      width:"100vw",
       background:isDarkMode?"linear-gradient(145deg, #1A2228, #182838, #151A22, #0A121A)":"linear-gradient(145deg,#E8F2F5 0%,#D0E8EC 35%,#E4EEF0 65%,#F0EBE0 100%)",
       backgroundSize:"400% 400%",
       animation:"bgDrift 15s ease infinite",
-      display:"flex",alignItems:"center",justifyContent:"center",
-      fontFamily:"'Courier New',monospace",
+      display:"flex",
+      flexDirection:"column", // 모바일에서는 기본적으로 세로 배치
+      alignItems:"center",
+      justifyContent:"flex-start",
+      overflow:"hidden",
       position:"relative",
+      fontFamily:"'Courier New',monospace",
     }}>
       <style>{`
+        body { margin: 0; padding: 0; overflow: hidden; touch-action: none; }
         @keyframes bgDrift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         @keyframes popFloat{0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}60%{opacity:1;transform:translateX(-50%) translateY(-32px) scale(1.08)}100%{opacity:0;transform:translateX(-50%) translateY(-56px) scale(0.9)}}
         @keyframes scoreJump{0%,100%{transform:scale(1)}40%{transform:scale(1.2)}}
@@ -634,41 +694,57 @@ export default function Tetris() {
           color:${isDarkMode?"#AADDFF":"#2A7080"};
           box-shadow:0 2px 12px rgba(0,100,120,0.15),inset 0 1px 0 rgba(255,255,255,0.9);
           backdrop-filter:blur(8px);
+          user-select: none;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
         }
         .glass-btn:hover{
           background:${isDarkMode?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.9)"};
           box-shadow:0 4px 20px rgba(0,100,120,0.25),inset 0 1px 0 rgba(255,255,255,1);
           transform:translateY(-1px);
         }
-        .mobile-controls {
-          display: none !important;
-        }
-        .main-layout {
-          display: flex; gap: 14px; align-items: flex-start;
+        .game-container {
+          display: flex;
+          gap: 20px;
+          padding: 20px;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s;
         }
 
+        /* 모바일에서는 사이드바를 숨기거나 위치 조정 */
         @media (max-width: 768px) {
-          .mobile-controls {
-            display: flex !important;
-          }
-          .main-layout {
+          .game-container {
             flex-direction: column;
-            align-items: center;
-            margin-top: 10px;
-            /* Disable scale to let dynamic cellSize take over, making board use real screen real estate better */
+            gap: 10px;
+            padding: 10px;
+            padding-top: 20px; /* 상단 다크모드 버튼 공간 */
           }
-          .left-panel, .right-panel {
-            display: none !important;
-          }
+          .left-panel, .right-panel { display: none !important; } /* 모바일에서는 일단 보드 집중 */
+          .mobile-stats { display: flex !important; gap: 10px; margin-bottom: 10px; }
+          .mobile-controls { display: flex !important; }
+          .dark-toggle { top: 10px !important; right: 10px !important; padding: 6px 14px !important; font-size: 9px !important; }
         }
       `}</style>
 
       {/* Dark Mode Toggle */}
-      <button className="glass-btn" onClick={() => setIsDarkMode(p => !p)} style={{position: 'absolute', top: 20, right: 20, zIndex: 100}}>
+      <button className="glass-btn dark-toggle" onClick={() => setIsDarkMode(p => !p)} style={{position: 'absolute', top: 20, right: 20, zIndex: 100}}>
         {isDarkMode ? "☀ LIGHT" : "🌙 DARK"}
       </button>
 
-      <div className="main-layout">
+      {/* 모바일 전용 상단 스탯 (사이드바 대신) */}
+      <div className="mobile-stats" style={{ display: "none", zIndex: 10, marginTop: 30 }}>
+         <Card isDark={isDarkMode} style={{padding: "5px 15px"}}>
+           <Label isDark={isDarkMode} style={{marginBottom: 0}}>SCORE</Label>
+           <BigNum value={score} size={16} isDark={isDarkMode}/>
+         </Card>
+         <Card isDark={isDarkMode} style={{padding: "5px 15px"}}>
+           <Label isDark={isDarkMode} style={{marginBottom: 0}}>NEXT</Label>
+           <div style={{transform: "scale(0.6)", height: 35, display: "flex", alignItems: "center"}}><NextPreview piece={next}/></div>
+         </Card>
+      </div>
+
+      <div className="game-container">
 
         {/* ══ LEFT PANEL ══ */}
         <div className="left-panel" style={{display:"flex",flexDirection:"column",gap:10,width:158}}>
@@ -724,8 +800,14 @@ export default function Tetris() {
             boxShadow:"0 8px 32px rgba(0,80,100,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",
             overflow:"hidden",
             backdropFilter:"blur(4px)",
-          }}>
-            <svg width={BW} height={BH} style={{display:"block"}}>
+            touchAction: "none",
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          >
+            <svg width={BW} height={BH} style={{display:"block", pointerEvents: "none"}}>
               <SvgDefs/>
 
               {/* 그리드 라인 */}
@@ -869,28 +951,33 @@ export default function Tetris() {
         </div>
       </div>
 
-      {/* Mobile Touch Controls */}
+      {/* ─── [해결책] 모바일 컨트롤러 하단 고정 ─── */}
       {started && !gameOver && !paused && (
-        <div style={{
-          position: "fixed", bottom: 10, left: "50%", transform: "translateX(-50%)",
-          display: "flex", gap: 30, zIndex: 9999, padding: "10px",
-          background: "rgba(255,255,255,0.15)", borderRadius: 30, backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.3)"
-        }} className="mobile-controls">
-          {/* Action Buttons */}
-          <div style={{display: "flex", flexDirection: "column", gap: 10, justifyContent: "center"}}>
-            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); holdPiece();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10, touchAction: "none"}}>HLD</button>
-            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); hardDrop();}} style={{padding: "12px", borderRadius: "50%", width: 50, height: 50, fontSize: 10, touchAction: "none"}}>DRP</button>
+        <div className="mobile-controls" style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          height: 200, display: "none", // 미디어 쿼리(App.jsx 스타일 또는 인라인 조작)에서 제어
+          background: isDarkMode ? "rgba(10,20,30,0.8)" : "rgba(255,255,255,0.5)",
+          backdropFilter: "blur(15px)",
+          borderTop: `1px solid ${isDarkMode ? "#334455" : "#CCE0E5"}`,
+          padding: "20px",
+          justifyContent: "space-around",
+          alignItems: "center",
+          zIndex: 1000
+        }}>
+          {/* 액션 버튼 그룹 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
+            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); holdPiece(); }} style={{width: 60, height: 60, borderRadius: "50%"}}>HLD</button>
+            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); hardDrop(); }} style={{width: 60, height: 60, borderRadius: "50%"}}>DRP</button>
           </div>
 
-          {/* D-Pad */}
-          <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, alignItems: "center", justifyContent: "center"}}>
-            <div/>
-            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); rotate();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>↻</button>
-            <div/>
-            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); moveLeft();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>←</button>
-            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); moveDown();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>↓</button>
-            <button className="glass-btn" onPointerDown={(e)=>{e.preventDefault(); moveRight();}} style={{padding: "15px", borderRadius: "50%", width: 55, height: 55, touchAction: "none"}}>→</button>
+          {/* 방향키 그룹 (D-Pad) */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            <div />
+            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); rotate(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>↻</button>
+            <div />
+            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); moveLeft(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>←</button>
+            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); moveDown(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>↓</button>
+            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); moveRight(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>→</button>
           </div>
         </div>
       )}
