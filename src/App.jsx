@@ -191,7 +191,6 @@ function HoldPreview({ piece }) {
   const W=maxW*SZ, H=(maxH+0.5)*SZ;
   return (
     <svg width={W} height={H} style={{display:"block",margin:"0 auto",overflow:"visible"}}>
-      <SvgDefs/>
       {piece && piece.shape.map((row,ri)=>row.map((cell,ci)=>{
         if (!cell) return null;
         const offX=Math.floor((maxW-piece.shape[0].length)/2);
@@ -214,7 +213,6 @@ function NextPreview({ piece }) {
   const W=maxW*SZ, H=(maxH+0.5)*SZ;
   return (
     <svg width={W} height={H} style={{display:"block",margin:"0 auto",overflow:"visible"}}>
-      <SvgDefs/>
       {piece.shape.map((row,ri)=>row.map((cell,ci)=>!cell?null:(
         <MiniTile key={`${ri}-${ci}`}
           cx={(ci+offX)*SZ} cy={(ri+offY)*SZ}
@@ -787,6 +785,11 @@ export default function Tetris() {
             fontWeight:700,
           }}>TETRIS</div>
 
+          {/* 전역 SvgDefs 선언 - 단 하나만 렌더링하도록 0크기 svg 사용 */}
+          <svg width="0" height="0" style={{position:"absolute"}}>
+            <SvgDefs/>
+          </svg>
+
           {/* 보드 컨테이너 */}
           <div style={{
             position:"relative",
@@ -804,8 +807,6 @@ export default function Tetris() {
           onPointerCancel={handlePointerUp}
           >
             <svg width={BW} height={BH} style={{display:"block", pointerEvents: "none"}}>
-              <SvgDefs/>
-
               {/* 그리드 라인 */}
               {Array.from({length:ROWS+1},(_,i)=>(
                 <line key={`h${i}`} x1={0} y1={i*cellSize} x2={BW} y2={i*cellSize}
@@ -881,7 +882,6 @@ export default function Tetris() {
                     <div style={{display:"flex",gap:4,margin:"4px 0"}}>
                       {["I","S","O","T","L"].map(k=>(
                         <svg key={k} width={28} height={28} style={{overflow:"visible"}}>
-                          <SvgDefs/>
                           <GlassTile cx={0} cy={0} tileKey={k} size={28}/>
                         </svg>
                       ))}
