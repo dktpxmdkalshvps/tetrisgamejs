@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { COLS, removeLines } from "./utils.js";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const COLS = 10;
 const ROWS = 20;
 const LINE_SCORES = [0, 100, 300, 500, 800, 800, 1200];
 const LINE_NAMES  = ["", "SINGLE", "DOUBLE", "TRIPLE", "TETRIS!", "T-SPIN SINGLE", "T-SPIN DOUBLE"];
@@ -51,10 +51,6 @@ function lockPiece(board, piece) {
   return b;
 }
 function findFullRows(board) { return board.reduce((a,row,i)=>{if(row.every(c=>c))a.push(i);return a;},[]);}
-function removeLines(board,rows) {
-  const kept=board.filter((_,i)=>!rows.includes(i));
-  return [...Array.from({length:rows.length},()=>Array(COLS).fill(null)),...kept];
-}
 function getGhost(board,piece) {
   let g={...piece}; while(isValid(board,g.shape,g.x,g.y+1)) g={...g,y:g.y+1}; return g;
 }
