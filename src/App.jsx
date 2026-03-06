@@ -405,11 +405,10 @@ export default function Tetris() {
   useEffect(() => {
     const handleResize = () => {
       const isMobile = window.innerWidth <= 768;
-      const mobileControlHeight = 220; // 모바일 컨트롤러가 차지할 높이
 
-      // 사용 가능한 높이 계산
+      // 사용 가능한 높이 계산 (모바일 컨트롤러 삭제로 전체 높이 활용)
       const availableHeight = isMobile
-        ? window.innerHeight - mobileControlHeight - 100 // 모바일은 컨트롤러 공간 제외
+        ? window.innerHeight - 150 // 상단 스탯 등 여유 공간
         : window.innerHeight * 0.8;
 
       // 사용 가능한 너비 계산
@@ -600,7 +599,8 @@ export default function Tetris() {
       startX: e.clientX,
       startY: e.clientY,
       lastX: e.clientX,
-      lastY: e.clientY
+      lastY: e.clientY,
+      hasMoved: false
     };
     e.target.setPointerCapture(e.pointerId);
   };
@@ -620,15 +620,24 @@ export default function Tetris() {
       if (deltaX > 0) moveRight();
       else moveLeft();
       dragRef.current.lastX = e.clientX;
+      dragRef.current.hasMoved = true;
     }
 
     if (deltaY > thresholdY) {
       moveDown();
       dragRef.current.lastY = e.clientY;
+      dragRef.current.hasMoved = true;
     }
   };
 
   const handlePointerUp = (e) => {
+    if (!dragRef.current.isDragging) return;
+
+    if (!dragRef.current.hasMoved) {
+      // 탭 동작 (이동이 없었을 경우)으로 회전
+      rotate();
+    }
+
     dragRef.current.isDragging = false;
     e.target.releasePointerCapture(e.pointerId);
   };
@@ -722,7 +731,6 @@ export default function Tetris() {
           }
           .left-panel, .right-panel { display: none !important; } /* 모바일에서는 일단 보드 집중 */
           .mobile-stats { display: flex !important; gap: 10px; margin-bottom: 10px; }
-          .mobile-controls { display: flex !important; }
           .dark-toggle { top: 10px !important; right: 10px !important; padding: 6px 14px !important; font-size: 9px !important; }
         }
       `}</style>
@@ -950,37 +958,6 @@ export default function Tetris() {
           )}
         </div>
       </div>
-
-      {/* ─── [해결책] 모바일 컨트롤러 하단 고정 ─── */}
-      {started && !gameOver && !paused && (
-        <div className="mobile-controls" style={{
-          position: "fixed", bottom: 0, left: 0, right: 0,
-          height: 200, display: "none", // 미디어 쿼리(App.jsx 스타일 또는 인라인 조작)에서 제어
-          background: isDarkMode ? "rgba(10,20,30,0.8)" : "rgba(255,255,255,0.5)",
-          backdropFilter: "blur(15px)",
-          borderTop: `1px solid ${isDarkMode ? "#334455" : "#CCE0E5"}`,
-          padding: "20px",
-          justifyContent: "space-around",
-          alignItems: "center",
-          zIndex: 1000
-        }}>
-          {/* 액션 버튼 그룹 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); holdPiece(); }} style={{width: 60, height: 60, borderRadius: "50%"}}>HLD</button>
-            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); hardDrop(); }} style={{width: 60, height: 60, borderRadius: "50%"}}>DRP</button>
-          </div>
-
-          {/* 방향키 그룹 (D-Pad) */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-            <div />
-            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); rotate(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>↻</button>
-            <div />
-            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); moveLeft(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>←</button>
-            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); moveDown(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>↓</button>
-            <button className="glass-btn" onPointerDown={(e) => { e.preventDefault(); moveRight(); }} style={{width: 65, height: 65, borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center"}}>→</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
