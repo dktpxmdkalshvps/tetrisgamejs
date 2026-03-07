@@ -503,8 +503,8 @@ export default function Tetris() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [cellSize,   setCellSize]   = useState(30);
   const [isMobile,   setIsMobile]   = useState(false);
-  const [ctrlScale,  setCtrlScale]  = useState(0.55);  // Fixed to 0.55
-  const [ctrlOffset, setCtrlOffset] = useState(0);     // controller bottom offset (0-120)
+  const [ctrlScale,  setCtrlScale]  = useState(0.7);   // Initial scale adjusted
+  const [ctrlOffset, setCtrlOffset] = useState(120);   // Default to max position 120px
 
   const live = useRef({});
   const bagRef = useRef([]);
@@ -921,7 +921,7 @@ export default function Tetris() {
             transition:"padding-bottom 0.1s ease-out",
           }}>
             <div style={{display:"flex", gap:8, width:"100%", justifyContent:"center", flexWrap:"wrap"}}>
-              <SettingsSlider label="↕ 위치" value={ctrlOffset} min={0} max={120} step={2} unit="px" onChange={setCtrlOffset} isDark={D}/>
+              <SettingsSlider label="📏 크기" value={ctrlScale} min={0.3} max={1.2} step={0.05} onChange={setCtrlScale} isDark={D}/>
             </div>
             <TouchControls {...ctrlProps}/>
           </div>
@@ -969,7 +969,7 @@ export default function Tetris() {
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                   <TouchControls {...ctrlProps}/>
                   <div style={{display:"flex", gap:8}}>
-                    <SettingsSlider label="↕ 위치" value={ctrlOffset} min={0} max={120} step={2} unit="px" onChange={setCtrlOffset} isDark={D}/>
+                    <SettingsSlider label="📏 크기" value={ctrlScale} min={0.3} max={1.2} step={0.05} onChange={setCtrlScale} isDark={D}/>
                   </div>
                 </div>
               )}
