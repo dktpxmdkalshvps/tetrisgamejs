@@ -903,9 +903,6 @@ export default function Tetris() {
 
           {/* MIDDLE: hold | board | next */}
           <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"4px 3px",minHeight:0}}>
-            <div style={{alignSelf:"flex-start",paddingTop:6}}>
-              <MiniSidePanel label="Hold" piece={heldPiece} isDark={D} onPress={holdPiece}/>
-            </div>
             {boardEl}
             <div style={{alignSelf:"flex-start",paddingTop:6}}>
               <MiniSidePanel label="Next" piece={next} isDark={D}/>
@@ -921,8 +918,8 @@ export default function Tetris() {
             backdropFilter:"blur(10px)",
             borderTop:`1px solid ${D?"rgba(80,120,140,0.3)":"rgba(160,205,220,0.4)"}`,
           }}>
-            <TouchControls {...ctrlProps}/>
             <SizeSlider value={ctrlScale} onChange={setCtrlScale} isDark={D}/>
+            <TouchControls {...ctrlProps}/>
           </div>
         </div>
 
