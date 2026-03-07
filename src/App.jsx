@@ -323,7 +323,7 @@ function TouchControls({ onLeft, onRight, onDown, onRotate, onHardDrop, onHold, 
       display:"flex", alignItems:"center", justifyContent:"center",
       gap: Math.round(14*ctrlScale),
       padding:`${pad}px ${Math.round(14*ctrlScale)}px`,
-      background:bg, backdropFilter:"blur(14px)",
+      background:bg,
       border:`1px solid ${bdr}`, borderRadius:Math.round(22*ctrlScale),
       boxShadow:"0 6px 24px rgba(0,80,100,0.14)",
     }}>
@@ -359,27 +359,26 @@ function TouchControls({ onLeft, onRight, onDown, onRotate, onHardDrop, onHold, 
   );
 }
 
-// ── CONTROLLER SIZE SLIDER ────────────────────────────────────────────────────
-function SizeSlider({ value, onChange, isDark }) {
-  const bg  = isDark ? "rgba(18,30,42,0.7)" : "rgba(240,250,255,0.55)";
-  const txt = isDark ? "rgba(160,200,220,0.6)" : "rgba(60,100,110,0.5)";
+// ── CONTROLLER SIZE/POSITION SLIDER ──────────────────────────────────────────
+function SettingsSlider({ label, value, min, max, step, unit="", onChange, isDark }) {
+  const bg  = isDark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.25)";
+  const txt = isDark ? "rgba(160,200,220,0.7)" : "rgba(60,100,110,0.6)";
   return (
     <div style={{
       display:"flex", alignItems:"center", gap:8,
-      padding:"6px 14px", background:bg,
-      backdropFilter:"blur(10px)",
-      borderRadius:20, border:`1px solid ${isDark?"rgba(70,110,130,0.4)":"rgba(160,200,215,0.5)"}`,
+      padding:"6px 12px", background:bg,
+      borderRadius:20, border:`1px solid ${isDark?"rgba(255,255,255,0.1)":"rgba(0,80,100,0.1)"}`,
     }}>
-      <span style={{fontSize:9, letterSpacing:2, color:txt, whiteSpace:"nowrap"}}>🎮 크기</span>
+      <span style={{fontSize:9, letterSpacing:1, color:txt, whiteSpace:"nowrap"}}>{label}</span>
       <input
-        type="range" min={0.55} max={1.45} step={0.05} value={value}
+        type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
         style={{
-          width:100, accentColor: isDark?"#5BC4C4":"#2A8A8A",
+          width:80, accentColor: isDark?"#5BC4C4":"#2A8A8A",
           cursor:"pointer", touchAction:"none",
         }}
       />
-      <span style={{fontSize:9, color:txt, minWidth:28}}>{Math.round(value*100)}%</span>
+      <span style={{fontSize:9, color:txt, minWidth:28}}>{value}{unit}</span>
     </div>
   );
 }
@@ -504,7 +503,8 @@ export default function Tetris() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [cellSize,   setCellSize]   = useState(30);
   const [isMobile,   setIsMobile]   = useState(false);
-  const [ctrlScale,  setCtrlScale]  = useState(1.0);   // controller size 0.55–1.45
+  const [ctrlScale,  setCtrlScale]  = useState(0.55);  // Fixed to 0.55
+  const [ctrlOffset, setCtrlOffset] = useState(0);     // controller bottom offset (0-120)
 
   const live = useRef({});
   const bagRef = useRef([]);
@@ -530,12 +530,13 @@ export default function Tetris() {
       const mob = vw < 700;
       setIsMobile(mob);
       if (mob) {
-        // Side panels ~70px each, top bar ~48px, bottom area depends on ctrlScale
-        const CTRL_H = Math.round((130 + 110*ctrlScale));
-        const avW = vw - 70*2 - 8*4;
-        const avH = vh - 48 - CTRL_H - 16;
+        // More accurate height calculation to prevent overlap
+        // TopBar (~50px) + Sliders (~45px) + Controls (~140*ctrlScale) + Offset + Gaps
+        const CTRL_H = Math.round(50 + 45 + (140 * ctrlScale)) + ctrlOffset;
+        const avW = vw - 70 - 32;
+        const avH = vh - CTRL_H - 20; // 20px extra buffer
         const cs = Math.floor(Math.min(avW/COLS, avH/ROWS));
-        setCellSize(Math.max(13, Math.min(cs, 32)));
+        setCellSize(Math.max(14, Math.min(cs, 38)));
       } else {
         const PANELS=170*2+14*2, CTRL_H=130;
         const avW = Math.min(vw-PANELS-40, 400);
@@ -909,16 +910,19 @@ export default function Tetris() {
             </div>
           </div>
 
-          {/* BOTTOM: controls + size slider */}
+          {/* BOTTOM: controls + settings sliders */}
           <div style={{
             flexShrink:0,
-            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-            padding:"5px 8px",paddingBottom:"max(5px,env(safe-area-inset-bottom,5px))",
-            background:D?"rgba(12,22,32,0.8)":"rgba(240,250,255,0.6)",
-            backdropFilter:"blur(10px)",
-            borderTop:`1px solid ${D?"rgba(80,120,140,0.3)":"rgba(160,205,220,0.4)"}`,
+            display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+            padding:"5px 8px",
+            paddingBottom:`max(${5 + ctrlOffset}px, env(safe-area-inset-bottom, ${5 + ctrlOffset}px))`,
+            background:D?"rgba(0,0,0,0.15)":"rgba(255,255,255,0.15)",
+            borderTop:`1px solid ${D?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)"}`,
+            transition:"padding-bottom 0.1s ease-out",
           }}>
-            <SizeSlider value={ctrlScale} onChange={setCtrlScale} isDark={D}/>
+            <div style={{display:"flex", gap:8, width:"100%", justifyContent:"center", flexWrap:"wrap"}}>
+              <SettingsSlider label="↕ 위치" value={ctrlOffset} min={0} max={120} step={2} unit="px" onChange={setCtrlOffset} isDark={D}/>
+            </div>
             <TouchControls {...ctrlProps}/>
           </div>
         </div>
@@ -964,7 +968,9 @@ export default function Tetris() {
               {started && !gameOver && (
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                   <TouchControls {...ctrlProps}/>
-                  <SizeSlider value={ctrlScale} onChange={setCtrlScale} isDark={D}/>
+                  <div style={{display:"flex", gap:8}}>
+                    <SettingsSlider label="↕ 위치" value={ctrlOffset} min={0} max={120} step={2} unit="px" onChange={setCtrlOffset} isDark={D}/>
+                  </div>
                 </div>
               )}
             </div>
