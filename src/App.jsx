@@ -359,128 +359,6 @@ function TouchControls({ onLeft, onRight, onDown, onRotate, onHardDrop, onHold, 
   );
 }
 
-// ── CONTROLLER SIZE/POSITION SLIDER ──────────────────────────────────────────
-function SettingsSlider({ label, value, min, max, step, unit="", onChange, isDark }) {
-  const bg  = isDark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.25)";
-  const txt = isDark ? "rgba(160,200,220,0.7)" : "rgba(60,100,110,0.6)";
-  return (
-    <div style={{
-      display:"flex", alignItems:"center", gap:8,
-      padding:"6px 12px", background:bg,
-      borderRadius:20, border:`1px solid ${isDark?"rgba(255,255,255,0.1)":"rgba(0,80,100,0.1)"}`,
-    }}>
-      <span style={{fontSize:9, letterSpacing:1, color:txt, whiteSpace:"nowrap"}}>{label}</span>
-      <input
-        type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(parseFloat(e.target.value))}
-        style={{
-          width:80, accentColor: isDark?"#5BC4C4":"#2A8A8A",
-          cursor:"pointer", touchAction:"none",
-        }}
-      />
-      <span style={{fontSize:9, color:txt, minWidth:28}}>{value}{unit}</span>
-    </div>
-  );
-}
-
-// ── BOARD TOUCH GESTURE HOOK ──────────────────────────────────────────────────
-// 제스처 규칙:
-//  탭 (작은 이동 + 짧은 시간)   → 회전
-//  스와이프 좌/우 (셀 단위 추적) → 이동
-//  빠른 아래 스와이프             → 하드 드롭
-//  느린 아래 드래그 (셀 단위)    → 소프트 드롭
-//  위 스와이프                   → 홀드
-function useBoardGestures({ onLeft, onRight, onDown, onRotate, onHardDrop, onHold, cellSize, active }) {
-  // React 합성 이벤트는 passive=true → preventDefault() 무시됨.
-  // DOM ref + native addEventListener({ passive:false }) 로 직접 등록.
-  const boardRef = useRef(null);
-  const cb       = useRef({});  // 최신 콜백을 항상 담아둠
-  const touch    = useRef(null);
-
-  // 매 렌더마다 최신 값으로 갱신 (리스너 재등록 불필요)
-  cb.current = { onLeft, onRight, onDown, onRotate, onHardDrop, onHold, cellSize, active };
-
-  useEffect(() => {
-    const el = boardRef.current;
-    if (!el) return;
-
-    const onStart = e => {
-      const { active, cellSize } = cb.current;
-      if (!active) return;
-      e.preventDefault();
-      const t = e.touches[0];
-      touch.current = {
-        startX:    t.clientX,
-        startY:    t.clientY,
-        startTime: Date.now(),
-        lastCellX: Math.floor(t.clientX / cellSize),
-        lastCellY: Math.floor(t.clientY / cellSize),
-        moved:     false,
-      };
-    };
-
-    const onMove = e => {
-      const { active, cellSize, onLeft, onRight, onDown } = cb.current;
-      if (!active || !touch.current) return;
-      e.preventDefault();
-      const t  = e.touches[0];
-      const tc = touch.current;
-      const dx = t.clientX - tc.startX;
-      const dy = t.clientY - tc.startY;
-
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) tc.moved = true;
-
-      // 수평 이동 (셀 단위)
-      if (Math.abs(dx) >= Math.abs(dy) * 1.0) {
-        const curCX = Math.floor(t.clientX / cellSize);
-        const diff  = curCX - tc.lastCellX;
-        if (diff !== 0) {
-          diff > 0 ? onRight() : onLeft();
-          tc.lastCellX = curCX;
-        }
-      }
-      // 수직 소프트 드롭 (셀 단위)
-      if (dy > 0 && Math.abs(dy) > Math.abs(dx) * 1.0) {
-        const curCY = Math.floor(t.clientY / cellSize);
-        const diff  = curCY - tc.lastCellY;
-        if (diff > 0) {
-          for (let i = 0; i < diff; i++) onDown();
-          tc.lastCellY = curCY;
-        }
-      }
-    };
-
-    const onEnd = e => {
-      const { active, onRotate, onHold, onHardDrop } = cb.current;
-      if (!active || !touch.current) return;
-      e.preventDefault();
-      const tc   = touch.current;
-      const dt   = Date.now() - tc.startTime;
-      const ct   = e.changedTouches[0];
-      const dx   = ct.clientX - tc.startX;
-      const dy   = ct.clientY - tc.startY;
-      const dist = Math.hypot(dx, dy);
-
-      if (!tc.moved && dist < 14 && dt < 280)               onRotate();   // 탭
-      else if (dy < -40 && Math.abs(dy) > Math.abs(dx)*1.3) onHold();     // 위 스와이프
-      else if (dy > 50 && dt < 320 && Math.abs(dy) > Math.abs(dx)*1.3) onHardDrop(); // 빠른 아래
-
-      touch.current = null;
-    };
-
-    el.addEventListener("touchstart", onStart, { passive: false });
-    el.addEventListener("touchmove",  onMove,  { passive: false });
-    el.addEventListener("touchend",   onEnd,   { passive: false });
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove",  onMove);
-      el.removeEventListener("touchend",   onEnd);
-    };
-  }, []); // 마운트 1회만 — 콜백은 cb.current ref로 참조
-
-  return boardRef;
-}
-
 // ── MAIN GAME ─────────────────────────────────────────────────────────────────
 export default function Tetris() {
   const [board,      setBoard]      = useState(createBoard());
@@ -503,8 +381,8 @@ export default function Tetris() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [cellSize,   setCellSize]   = useState(30);
   const [isMobile,   setIsMobile]   = useState(false);
-  const [ctrlScale,  setCtrlScale]  = useState(0.7);   // Initial scale adjusted
-  const [ctrlOffset, setCtrlOffset] = useState(120);   // Default to max position 120px
+  const [ctrlScale,  setCtrlScale]  = useState(0.72);  // Scale reduced by 20% from 0.9
+  const [ctrlOffset, setCtrlOffset] = useState(92);    // Offset reduced by 10px from 102px
 
   const live = useRef({});
   const bagRef = useRef([]);
@@ -531,10 +409,10 @@ export default function Tetris() {
       setIsMobile(mob);
       if (mob) {
         // More accurate height calculation to prevent overlap
-        // TopBar (~50px) + Sliders (~45px) + Controls (~140*ctrlScale) + Offset + Gaps
-        const CTRL_H = Math.round(50 + 45 + (140 * ctrlScale)) + ctrlOffset;
+        // TopBar (~50px) + Controls (~140*ctrlScale) + Offset + Gaps
+        const CTRL_H = Math.round(50 + (140 * ctrlScale)) + ctrlOffset;
         const avW = vw - 70 - 32;
-        const avH = vh - CTRL_H - 20; // 20px extra buffer
+        const avH = vh - CTRL_H - 20; 
         const cs = Math.floor(Math.min(avW/COLS, avH/ROWS));
         setCellSize(Math.max(14, Math.min(cs, 38)));
       } else {
@@ -682,13 +560,6 @@ export default function Tetris() {
     return () => window.removeEventListener("keydown", onKey);
   }, [started,gameOver,moveLeft,moveRight,moveDown,rotate,hardDrop,holdPiece,togglePause]);
 
-  // ── board gestures ─────────────────────────────────────────────────────────
-  const boardRef = useBoardGestures({
-    onLeft:moveLeft, onRight:moveRight, onDown:moveDown,
-    onRotate:rotate, onHardDrop:hardDrop, onHold:holdPiece,
-    cellSize, active: started && !gameOver && !paused,
-  });
-
   // ── start ──────────────────────────────────────────────────────────────────
   const startGame = () => {
     fillBag();
@@ -719,12 +590,6 @@ export default function Tetris() {
   const comboActive=combo>1;
   const D=isDarkMode;
 
-  // ── gesture hint overlay ───────────────────────────────────────────────────
-  const [showHint, setShowHint] = useState(true);
-  useEffect(() => {
-    if (started) { const t=setTimeout(()=>setShowHint(false),2800); return()=>clearTimeout(t); }
-  }, [started]);
-
   const ctrlProps = { onLeft:moveLeft, onRight:moveRight, onDown:moveDown,
     onRotate:rotate, onHardDrop:hardDrop, onHold:holdPiece,
     onPause:togglePause, isDark:D, ctrlScale, isMobile };
@@ -732,12 +597,11 @@ export default function Tetris() {
   // ── board element ──────────────────────────────────────────────────────────
   const boardEl = (
     <div
-      ref={boardRef}
       style={{position:"relative",background:D?"rgba(0,0,0,0.45)":"rgba(255,255,255,0.35)",
         border:`1px solid ${D?"rgba(80,100,120,0.5)":"rgba(180,220,228,0.6)"}`,
         borderRadius:8,overflow:"hidden",backdropFilter:"blur(4px)",
         boxShadow:"0 8px 32px rgba(0,80,100,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",
-        cursor:"crosshair", userSelect:"none", touchAction:"none",
+        userSelect:"none", touchAction:"none",
       }}
     >
       <svg width={BW} height={BH} style={{display:"block",touchAction:"none"}}>
@@ -758,33 +622,6 @@ export default function Tetris() {
       </svg>
 
       <ScorePopup popups={popups} cellSize={cellSize}/>
-
-      {/* 제스처 안내 (게임 시작 직후 잠깐 표시) */}
-      {started && showHint && isMobile && (
-        <div style={{
-          position:"absolute",inset:0,pointerEvents:"none",
-          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,
-          background:"rgba(0,0,0,0.0)",
-        }}>
-          {[
-            {icon:"👆", text:"탭 → 회전"},
-            {icon:"👈👉", text:"스와이프 → 이동"},
-            {icon:"👇", text:"빠른 스와이프↓ → 하드 드롭"},
-            {icon:"☝️", text:"스와이프↑ → 홀드"},
-          ].map((h,i) => (
-            <div key={i} style={{
-              background:"rgba(0,0,0,0.55)",backdropFilter:"blur(6px)",
-              borderRadius:20,padding:"4px 14px",
-              fontSize:11,color:"#fff",letterSpacing:1,
-              display:"flex",gap:6,alignItems:"center",
-              opacity: showHint ? 1 : 0,
-              animation:`hintFade 2.8s ease forwards ${i*0.1}s`,
-            }}>
-              <span>{h.icon}</span><span>{h.text}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* 오버레이 */}
       {(!started||gameOver||paused) && (
@@ -807,11 +644,6 @@ export default function Tetris() {
           ) : paused ? (
             <>
               <div style={{fontSize:22,fontWeight:900,color:D?"#88DDEE":"#1A6070",letterSpacing:8}}>PAUSED</div>
-              {isMobile && (
-                <div style={{fontSize:9,color:D?"rgba(200,220,230,0.5)":"rgba(60,100,110,0.4)",letterSpacing:2,textAlign:"center",lineHeight:1.8}}>
-                  탭 → 회전 &nbsp;|&nbsp; 스와이프 → 이동<br/>빠른 ↓ → 하드드롭 &nbsp;|&nbsp; ↑ → 홀드
-                </div>
-              )}
               <button className="glass-btn" onClick={()=>setPaused(false)}>RESUME</button>
             </>
           ) : (
@@ -822,12 +654,6 @@ export default function Tetris() {
                 background:"linear-gradient(135deg,#2A9090,#5BC4C4 40%,#A09050 70%,#C8B878)",
                 WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",
               }}>TETRIS</div>
-              {isMobile && (
-                <div style={{fontSize:9,color:D?"rgba(200,220,230,0.5)":"rgba(60,100,110,0.5)",letterSpacing:1,textAlign:"center",lineHeight:2}}>
-                  보드를 직접 터치해서 플레이하세요<br/>
-                  탭=회전 · 스와이프=이동 · 빠른↓=하드드롭
-                </div>
-              )}
               <div style={{display:"flex",gap:4,margin:"4px 0"}}>
                 {["I","S","O","T","L"].map(k=>(
                   <svg key={k} width={22} height={22} style={{overflow:"visible"}}><SvgDefs/><GlassTile cx={0} cy={0} tileKey={k} size={22}/></svg>
@@ -921,7 +747,6 @@ export default function Tetris() {
             transition:"padding-bottom 0.1s ease-out",
           }}>
             <div style={{display:"flex", gap:8, width:"100%", justifyContent:"center", flexWrap:"wrap"}}>
-              <SettingsSlider label="📏 크기" value={ctrlScale} min={0.3} max={1.2} step={0.05} onChange={setCtrlScale} isDark={D}/>
             </div>
             <TouchControls {...ctrlProps}/>
           </div>
@@ -968,9 +793,6 @@ export default function Tetris() {
               {started && !gameOver && (
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                   <TouchControls {...ctrlProps}/>
-                  <div style={{display:"flex", gap:8}}>
-                    <SettingsSlider label="📏 크기" value={ctrlScale} min={0.3} max={1.2} step={0.05} onChange={setCtrlScale} isDark={D}/>
-                  </div>
                 </div>
               )}
             </div>
