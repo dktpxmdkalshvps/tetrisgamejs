@@ -690,64 +690,84 @@ export default function Tetris() {
         .glass-btn:hover{background:${D?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.9)"};box-shadow:0 4px 20px rgba(0,100,120,0.25);transform:translateY(-1px);}
       `}</style>
 
-      {/* Dark toggle */}
-      <button className="glass-btn" onClick={()=>setIsDarkMode(p=>!p)}
-        style={{position:"fixed",top:10,right:10,zIndex:300,padding:"5px 12px",fontSize:9,letterSpacing:2}}>
-        {D?"☀":"🌙"}
-      </button>
+      {/* Dark toggle (Desktop only) */}
+      {!isMobile && (
+        <button className="glass-btn" onClick={()=>setIsDarkMode(p=>!p)}
+          style={{position:"fixed",top:10,right:10,zIndex:300,padding:"5px 12px",fontSize:9,letterSpacing:2}}>
+          {D?"☀":"🌙"}
+        </button>
+      )}
 
       {/* ══════════════ MOBILE ══════════════ */}
       {isMobile ? (
-        <div style={{display:"flex",flexDirection:"column",width:"100vw",height:"100vh",overflow:"hidden"}}>
+        <div style={{display:"flex",flexDirection:"column",width:"100vw",height:"100vh",overflow:"hidden",paddingTop:0}}>
 
-          {/* TOP BAR */}
-          <div style={{
-            display:"flex",alignItems:"center",justifyContent:"space-between",
-            padding:"8px 14px",paddingTop:"max(8px,env(safe-area-inset-top,8px))",
-            background:D?"rgba(12,22,32,0.8)":"rgba(240,250,255,0.6)",
-            backdropFilter:"blur(10px)",
-            borderBottom:`1px solid ${D?"rgba(80,120,140,0.3)":"rgba(160,205,220,0.4)"}`,
-            flexShrink:0,
-          }}>
-            <div>
-              <div style={{fontSize:8,letterSpacing:3,color:D?"rgba(160,200,220,0.5)":"rgba(60,100,110,0.45)"}}>SCORE</div>
-              <div style={{fontSize:18,fontWeight:900,color:D?"#88DDEE":"#1A6070",fontFamily:"'Courier New',monospace",animation:scoreFlash?"scoreJump 0.4s ease":"none"}}>
-                {score.toString().padStart(7,"0")}
-              </div>
+          {/* 메인 게임 영역 (보드 + 우측 패널) */}
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 6px 0",minHeight:0}}>
+            {/* 중앙 보드 */}
+            <div style={{display:"flex",justifyContent:"center",alignItems:"center"}}>
+              {boardEl}
             </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:9,letterSpacing:5,color:D?"rgba(160,200,220,0.35)":"rgba(60,100,110,0.35)",fontWeight:700}}>TETRIS</div>
-              {comboActive && <div style={{fontSize:9,color:"#C8A030",letterSpacing:2,marginTop:1}}>×{combo} COMBO</div>}
-              {!comboActive && <div style={{fontSize:8,color:D?"rgba(160,200,220,0.3)":"rgba(60,100,110,0.3)",letterSpacing:1,marginTop:1}}>LV.{level}</div>}
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:8,letterSpacing:3,color:D?"rgba(160,200,220,0.5)":"rgba(60,100,110,0.45)"}}>LINES</div>
-              <div style={{fontSize:18,fontWeight:900,color:D?"#5BC4C4":"#2A8A8A",fontFamily:"'Courier New',monospace"}}>
-                {lines.toString().padStart(4,"0")}
-              </div>
-            </div>
-          </div>
+            
+            {/* 우측 사이드 패널 */}
+            <div style={{display:"flex",flexDirection:"column",gap:5,alignSelf:"flex-start",paddingTop:10,width:68}}>
+              {/* 다크 모드 토글 */}
+              <button 
+                onClick={()=>setIsDarkMode(p=>!p)}
+                style={{
+                  padding:"6px 0",fontSize:10,fontWeight:700,width:"100%",borderRadius:8,
+                  background:D?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.7)",
+                  border:`1px solid ${D?"rgba(255,255,255,0.2)":"rgba(100,180,190,0.5)"}`,
+                  color:D?"#AADDFF":"#2A7080", backdropFilter:"blur(8px)", cursor:"pointer"
+                }}
+              >
+                {D?"☀ LIGHT":"🌙 DARK"}
+              </button>
 
-          {/* MIDDLE: hold | board | next */}
-          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"4px 3px",minHeight:0}}>
-            {boardEl}
-            <div style={{alignSelf:"flex-start",paddingTop:6}}>
               <MiniSidePanel label="Next" piece={next} isDark={D}/>
+              
+              <div style={{
+                background:D?"rgba(15,25,35,0.85)":"rgba(255,255,255,0.7)",
+                backdropFilter:"blur(10px)", border:`1px solid ${D?"rgba(80,120,140,0.6)":"rgba(160,205,220,0.8)"}`,
+                borderRadius:8, padding:"5px 2px", textAlign:"center"
+              }}>
+                <div style={{fontSize:8,letterSpacing:1,fontWeight:700,color:D?"#88AACC":"#1A5060",marginBottom:1}}>SCORE</div>
+                <div style={{fontSize:12,fontWeight:900,color:D?"#88DDEE":"#1A6070"}}>{score}</div>
+              </div>
+
+              <div style={{
+                background:D?"rgba(15,25,35,0.85)":"rgba(255,255,255,0.7)",
+                backdropFilter:"blur(10px)", border:`1px solid ${D?"rgba(80,120,140,0.6)":"rgba(160,205,220,0.8)"}`,
+                borderRadius:8, padding:"5px 2px", textAlign:"center"
+              }}>
+                <div style={{fontSize:8,letterSpacing:1,fontWeight:700,color:D?"#88AACC":"#1A5060",marginBottom:1}}>LEVEL</div>
+                <div style={{fontSize:12,fontWeight:900,color:D?"#C8B878":"#A89050"}}>{level}</div>
+              </div>
+
+              {comboActive && (
+                <div style={{
+                  background:"rgba(200,160,60,0.2)",
+                  backdropFilter:"blur(10px)", border:"2px solid rgba(200,160,60,0.8)",
+                  borderRadius:8, padding:"4px 2px", textAlign:"center", animation:"scoreJump 0.4s ease"
+                }}>
+                  <div style={{fontSize:8,fontWeight:800,color:"#8A6010"}}>COMBO</div>
+                  <div style={{fontSize:13,fontWeight:900,color:"#C8A030"}}>×{combo}</div>
+                </div>
+              )}
+              
+              <MiniSidePanel label="Hold" piece={heldPiece} isDark={D} onPress={holdPiece}/>
             </div>
           </div>
 
-          {/* BOTTOM: controls + settings sliders */}
+          {/* 하단 컨트롤러 영역 */}
           <div style={{
             flexShrink:0,
-            display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+            display:"flex",justifyContent:"center",
             padding:"5px 8px",
             paddingBottom:`max(${5 + ctrlOffset}px, env(safe-area-inset-bottom, ${5 + ctrlOffset}px))`,
-            background:D?"rgba(0,0,0,0.15)":"rgba(255,255,255,0.15)",
-            borderTop:`1px solid ${D?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)"}`,
+            background:D?"rgba(0,0,0,0.05)":"rgba(255,255,255,0.05)",
             transition:"padding-bottom 0.1s ease-out",
           }}>
-            <div style={{display:"flex", gap:8, width:"100%", justifyContent:"center", flexWrap:"wrap"}}>
-            </div>
             <TouchControls {...ctrlProps}/>
           </div>
         </div>
