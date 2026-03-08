@@ -1,16 +1,77 @@
-# React + Vite
+# Glass Tetris Arcade (Arcade Edition) 🎮
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+아름다운 유리 질감(Glassmorphism) UI와 사용자 친화적인 조작감을 제공하는 현대적인 웹 테트리스 게임입니다. PC와 모바일 환경 모두에서 최적화된 아케이드 경험을 제공합니다.
 
-Currently, two official plugins are available:
+## 📌 프로젝트 목적
+- **현대적인 UI 구현**: SVG 필터와 그라디언트를 활용하여 투명하고 입체적인 유리 질감의 디자인을 웹 기술로 구현합니다.
+- **크로스 플랫폼 최적화**: 데스크탑의 키보드 조작과 모바일의 터치 조작 모두에 최적화된 반응형 인터페이스를 제공합니다.
+- **실감 나는 아케이드 경험**: 콤보 시스템, T-Spin 감지, 고스트 피스 등 고전 테트리스의 핵심 메커니즘을 충실히 구현합니다.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠 기술 스택
+- **Framework**: React 18
+- **Styling**: Inline CSS (Dynamic Styling), Glassmorphism UI
+- **Graphics**: SVG (Scalable Vector Graphics) for Tiles and Board
+- **Build Tool**: Vite
+- **Language**: JavaScript (ES6+)
 
-## React Compiler
+## ✨ 핵심 기능
+- **고급 렌더링**: 각 블록(Mino)은 동적으로 생성된 SVG 그라디언트와 내부 광택 효과로 렌더링됩니다.
+- **스마트 레이아웃**: 
+  - **Desktop**: 정보를 좌우로 배치하여 넓은 화면을 효율적으로 사용합니다.
+  - **Mobile**: 상단바를 제거하고 모든 정보를 우측 사이드 패널로 통합하여 게임 보드 가독성을 극대화했습니다.
+- **정교한 조작**:
+  - **Keyboard**: 방향키(이동), 위/Z(회전), 스페이스(하드드롭), C(홀드).
+  - **Mobile Controller**: 화면 하단에 크기 조절이 가능한 전용 터치 패드를 제공합니다.
+- **게임 시스템**: 7-Bag 랜덤 피스 생성, 고스트 블록(착지 지점 미리보기), T-Spin 보너스, 콤보 배수 시스템 적용.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 📸 스크린샷
 
-## Expanding the ESLint configuration
+### [Light Mode]
+![Light Theme](./theme_light.png)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### [Dark Mode]
+![Dark Theme](./theme_dark.png)
+
+## 🚀 설치 및 실행 방법
+
+1. **저장소 클론**
+   ```bash
+   git clone https://github.com/dktpxmdkalshvps/tetrisgamejs.git
+   cd tetrisgamejs
+   ```
+
+2. **의존성 설치**
+   ```bash
+   npm install
+   ```
+
+3. **로컬 실행**
+   ```bash
+   npm run dev
+   ```
+
+4. **빌드**
+   ```bash
+   npm run build
+   ```
+
+## 🧠 개발 과정 및 해결한 이슈
+
+### 1. 모바일 조작 가독성 및 오작동 문제
+- **이슈**: 초기에는 보드를 직접 터치/스와이프하는 제스처 방식을 도입했으나, 손가락이 보드를 가려 가독성이 떨어지고 의도치 않은 하드드롭이 발생하는 문제가 있었습니다.
+- **해결**: 보드 직접 터치 기능을 과감히 삭제하고, 화면 하단에 전용 **Touch D-Pad**를 배치했습니다. 또한 설정 슬라이더를 통해 사용자가 본인 손 크기에 맞게 컨트롤러 크기를 조절할 수 있도록 개선했습니다.
+
+### 2. 모바일 화면 공간 부족 (상단바 제거)
+- **이슈**: 모바일의 좁은 세로 화면에서 상단바가 차지하는 영역 때문에 게임 보드가 너무 작게 표시되는 문제가 있었습니다.
+- **해결**: 상단바를 완전히 제거하고 점수, 레벨, 다음 블록, 다크모드 버튼을 모두 **우측 사이드 패널**로 이동시켰습니다. 이를 통해 보드 높이를 약 20px 이상 키워 시원한 시야를 확보했습니다.
+
+### 3. 유리 질감 UI 성능 최적화
+- **이슈**: 많은 수의 SVG 블록에 필터(DropShadow)를 적용하자 모바일 환경에서 프레임 드랍이 발생했습니다.
+- **해결**: 정적인 배경 요소와 동적인 블록의 렌더링 레이어를 분리하고, 불필요한 SVG 재연산을 `useMemo`와 `useCallback`으로 최적화하여 60FPS의 부드러운 움직임을 구현했습니다.
+
+### 4. 컨트롤러 위치 및 고정값 최적화
+- **이슈**: 다양한 기기에서 컨트롤러 위치가 들쭉날쭉하거나 보드와 겹치는 현상이 있었습니다.
+- **해결**: 사용자 피드백을 반영하여 컨트롤러 위치를 화면 최하단에서 92px 위로 고정하고, `ctrlScale` 값을 0.72로 설정하여 최적의 조작 범위를 찾아 기본값으로 적용했습니다.
+
+---
+Developed with ❤️ for the Tetris community.
