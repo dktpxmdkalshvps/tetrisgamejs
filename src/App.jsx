@@ -409,12 +409,12 @@ export default function Tetris() {
       setIsMobile(mob);
       if (mob) {
         // More accurate height calculation to prevent overlap
-        // TopBar (~50px) + Controls (~140*ctrlScale) + Offset + Gaps
-        const CTRL_H = Math.round(50 + (140 * ctrlScale)) + ctrlOffset;
-        const avW = vw - 70 - 32;
-        const avH = vh - CTRL_H - 20; 
+        // Controls (~140*ctrlScale) + Offset + Gaps
+        const CTRL_H = Math.round((140 * ctrlScale)) + ctrlOffset;
+        const avW = vw - 75 - 20; // 75px for side panel + 20px margin
+        const avH = vh - CTRL_H - 5; // Reduced buffer to allow ~20px more height
         const cs = Math.floor(Math.min(avW/COLS, avH/ROWS));
-        setCellSize(Math.max(14, Math.min(cs, 38)));
+        setCellSize(Math.max(14, Math.min(cs, 40))); // Increased max size to 40
       } else {
         const PANELS=170*2+14*2, CTRL_H=130;
         const avW = Math.min(vw-PANELS-40, 400);
