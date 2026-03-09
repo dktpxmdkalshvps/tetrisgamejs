@@ -1,28 +1,44 @@
-# Glass Tetris Arcade (Arcade Edition) 🎮
+# 🧊 Glass Tetris Arcade (Arcade Edition) 🎮
 
-아름다운 유리 질감(Glassmorphism) UI와 사용자 친화적인 조작감을 제공하는 현대적인 웹 테트리스 게임입니다. PC와 모바일 환경 모두에서 최적화된 아케이드 경험을 제공합니다.
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 📌 프로젝트 목적
-- **현대적인 UI 구현**: SVG 필터와 그라디언트를 활용하여 투명하고 입체적인 유리 질감의 디자인을 웹 기술로 구현합니다.
-- **크로스 플랫폼 최적화**: 데스크탑의 키보드 조작과 모바일의 터치 조작 모두에 최적화된 반응형 인터페이스를 제공합니다.
-- **실감 나는 아케이드 경험**: 콤보 시스템, T-Spin 감지, 고스트 피스 등 고전 테트리스의 핵심 메커니즘을 충실히 구현합니다.
+**Glass Tetris Arcade**는 현대적인 **Glassmorphism(유리 질감)** 디자인 언어를 테트리스라는 고전적인 게임에 결합한 실험적인 프로젝트입니다. 정교한 SVG 렌더링 기술과 반응형 인터페이스를 통해 PC와 모바일 모두에서 몰입감 넘치는 아케이드 경험을 제공합니다.
 
-## 🛠 기술 스택
-- **Framework**: React 18
-- **Styling**: Inline CSS (Dynamic Styling), Glassmorphism UI
-- **Graphics**: SVG (Scalable Vector Graphics) for Tiles and Board
-- **Build Tool**: Vite
-- **Language**: JavaScript (ES6+)
+---
 
-## ✨ 핵심 기능
-- **고급 렌더링**: 각 블록(Mino)은 동적으로 생성된 SVG 그라디언트와 내부 광택 효과로 렌더링됩니다.
-- **스마트 레이아웃**: 
-  - **Desktop**: 정보를 좌우로 배치하여 넓은 화면을 효율적으로 사용합니다.
-  - **Mobile**: 상단바를 제거하고 모든 정보를 우측 사이드 패널로 통합하여 게임 보드 가독성을 극대화했습니다.
-- **정교한 조작**:
-  - **Keyboard**: 방향키(이동), 위/Z(회전), 스페이스(하드드롭), C(홀드).
-  - **Mobile Controller**: 화면 하단에 크기 조절이 가능한 전용 터치 패드를 제공합니다.
-- **게임 시스템**: 7-Bag 랜덤 피스 생성, 고스트 블록(착지 지점 미리보기), T-Spin 보너스, 콤보 배수 시스템 적용.
+## ✨ 핵심 기능 (Key Features)
+
+### 🎨 시각적 경험
+- **Glassmorphism UI**: 투명도, 블러(Backdrop-blur), 정교한 그라디언트를 활용하여 입체적이고 현대적인 유리 질감을 구현했습니다.
+- **Dynamic SVG Tiles**: 각 블록(Mino)은 단순한 이미지가 아닌, 실시간으로 계산된 SVG 필터와 다중 레이어 그라디언트로 렌더링되어 부드럽고 선명한 화질을 보장합니다.
+- **다크 모드 지원**: 사용자 환경에 맞춘 세련된 라이트/다크 테마를 제공합니다.
+
+### 🕹 게임 플레이 엔진
+- **정교한 시스템**: 7-Bag 랜덤 피스 생성 알고리즘, 고스트 피스(착지 지점 가이드), 홀드(Hold) 기능을 포함한 정통 테트리스 룰을 충실히 구현했습니다.
+- **고급 보너스 시스템**: T-Spin 감지 로직, 콤보 배수 시스템, 라인 클리어 효과 등을 통해 높은 점수를 향한 아케이드적 재미를 더했습니다.
+- **부드러운 조작감**: 키보드 입력 지연을 최소화하고 모바일 터치 오작동을 방지하는 최적화된 입력 시스템을 갖추고 있습니다.
+
+### 📱 크로스 플랫폼 최적화
+- **데스크탑**: 정보를 좌우로 배치하여 넓은 화면을 효율적으로 활용하는 대시보드 레이아웃.
+- **모바일**: 상단바를 과감히 제거하고 우측 사이드 패널로 UI를 통합하여 게임 화면 가독성을 극대화했습니다.
+- **Touch D-Pad**: 모바일 전용 커스텀 컨트롤 패드를 제공하며, 설정에서 크기를 자유롭게 조절할 수 있습니다.
+
+---
+
+## 🛠 기술 스택 (Tech Stack)
+
+### Frontend
+- **React 19**: 최신 버전의 React를 활용한 컴포넌트 기반 아키텍처 및 상태 관리.
+- **Vanilla CSS (Inline Styling)**: 동적인 스타일 변경과 테마 전환을 위해 고도로 최적화된 인라인 스타일 전략 사용.
+- **SVG Graphics**: 모든 게임 에셋을 벡터 방식으로 구현하여 어떤 해상도에서도 깨짐 없는 그래픽 제공.
+
+### Build & Tools
+- **Vite 7**: 초고속 개발 서버 및 최적화된 빌드 환경.
+- **ESLint**: 일관된 코드 품질 유지.
+
+---
 
 ## 📸 스크린샷
 
@@ -31,6 +47,8 @@
 
 ### [Dark Mode]
 ![Dark Theme](./theme_dark.png)
+
+---
 
 ## 🚀 설치 및 실행 방법
 
@@ -54,6 +72,8 @@
    ```bash
    npm run build
    ```
+
+---
 
 ## 🧠 개발 과정 및 해결한 이슈
 
