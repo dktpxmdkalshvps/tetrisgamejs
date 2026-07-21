@@ -154,17 +154,23 @@ function PiecePreview({ piece, sz=22 }) {
 }
 
 // ── UI PRIMITIVES ─────────────────────────────────────────────────────────────
-function Card({ children, accent, glow, style={}, isDark=false }) {
-  const c = accent || (isDark ? "rgba(60,100,120,0.3)" : "rgba(180,210,220,0.3)");
-  return (
-    <div style={{
-      background: isDark ? "rgba(20,30,40,0.75)" : "rgba(255,255,255,0.55)",
-      border: `1px solid ${glow ? c : (isDark ? "rgba(80,100,120,0.5)" : "rgba(180,210,220,0.5)")}`,
-      borderRadius:10, padding:"10px 14px", backdropFilter:"blur(8px)",
-      boxShadow: glow ? `0 4px 20px ${c}88, inset 0 1px 0 rgba(255,255,255,0.8)` : "0 2px 8px rgba(0,60,80,0.08), inset 0 1px 0 rgba(255,255,255,0.7)",
-      transition:"all 0.3s", ...style,
-    }}>{children}</div>
-  );
+function Card({ children, accent, glow, style = {}, isDark = false }) {
+  const accentColor = accent || (isDark ? "rgba(60,100,120,0.3)" : "rgba(180,210,220,0.3)");
+
+  const cardStyle = {
+    background: isDark ? "rgba(20,30,40,0.75)" : "rgba(255,255,255,0.55)",
+    border: `1px solid ${glow ? accentColor : (isDark ? "rgba(80,100,120,0.5)" : "rgba(180,210,220,0.5)")}`,
+    borderRadius: 10,
+    padding: "10px 14px",
+    backdropFilter: "blur(8px)",
+    boxShadow: glow
+      ? `0 4px 20px ${accentColor}88, inset 0 1px 0 rgba(255,255,255,0.8)`
+      : "0 2px 8px rgba(0,60,80,0.08), inset 0 1px 0 rgba(255,255,255,0.7)",
+    transition: "all 0.3s",
+    ...style,
+  };
+
+  return <div style={cardStyle}>{children}</div>;
 }
 const Label = ({ children, isDark=false }) => (
   <div style={{fontSize:9,letterSpacing:4,color:isDark?"#88AACC":"rgba(60,100,110,0.5)",marginBottom:5,textTransform:"uppercase"}}>{children}</div>
