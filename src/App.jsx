@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const COLS = 10;
@@ -572,18 +572,27 @@ export default function Tetris() {
   };
 
   // ── display board ──────────────────────────────────────────────────────────
-  const ghost = (current&&!gameOver&&!clearing) ? getGhost(board,current) : null;
-  const displayBoard = board.map(r=>[...r]);
-  if (ghost) ghost.shape.forEach((row,r) => row.forEach((cell,c) => {
-    if (!cell) return;
-    const nr=ghost.y+r, nc=ghost.x+c;
-    if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!displayBoard[nr][nc]) displayBoard[nr][nc]="__ghost__";
-  }));
-  if (current&&!gameOver) current.shape.forEach((row,r) => row.forEach((cell,c) => {
-    if (!cell) return;
-    const nr=current.y+r, nc=current.x+c;
-    if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) displayBoard[nr][nc]=current.key;
-  }));
+  const ghost = useMemo(() => (current&&!gameOver&&!clearing) ? getGhost(board,current) : null, [board, current, gameOver, clearing]);
+  const displayBoard = useMemo(() => {
+    const b = [...board];
+    if (ghost) ghost.shape.forEach((row,r) => row.forEach((cell,c) => {
+      if (!cell) return;
+      const nr=ghost.y+r, nc=ghost.x+c;
+      if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!b[nr][nc]) {
+        if (b[nr] === board[nr]) b[nr] = [...board[nr]];
+        b[nr][nc]="__ghost__";
+      }
+    }));
+    if (current&&!gameOver) current.shape.forEach((row,r) => row.forEach((cell,c) => {
+      if (!cell) return;
+      const nr=current.y+r, nc=current.x+c;
+      if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) {
+        if (b[nr] === board[nr]) b[nr] = [...board[nr]];
+        b[nr][nc]=current.key;
+      }
+    }));
+    return b;
+  }, [board, current, ghost, gameOver]);
 
   const BW=COLS*cellSize, BH=ROWS*cellSize;
   const newHi=score>0&&score>=hiScore;
