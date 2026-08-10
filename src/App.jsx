@@ -381,8 +381,8 @@ export default function Tetris() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [cellSize,   setCellSize]   = useState(30);
   const [isMobile,   setIsMobile]   = useState(false);
-  const [ctrlScale,  setCtrlScale]  = useState(0.72);  // Scale reduced by 20% from 0.9
-  const [ctrlOffset, setCtrlOffset] = useState(92);    // Offset reduced by 10px from 102px
+  const [ctrlScale]  = useState(0.72);  // Scale reduced by 20% from 0.9
+  const [ctrlOffset] = useState(92);    // Offset reduced by 10px from 102px
 
   const live = useRef({});
   const bagRef = useRef([]);
@@ -399,7 +399,9 @@ export default function Tetris() {
     return createPiece(bagRef.current.pop());
   }, [fillBag]);
 
-  live.current = {board,current,gameOver,paused,clearing,combo,heldPiece,hasSwapped};
+  useEffect(() => {
+    live.current = {board,current,gameOver,paused,clearing,combo,heldPiece,hasSwapped};
+  });
 
   // ── responsive cell size ───────────────────────────────────────────────────
   useLayoutEffect(() => {
@@ -426,7 +428,7 @@ export default function Tetris() {
     calc();
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
-  }, [ctrlScale]);
+  }, [ctrlScale, ctrlOffset]);
 
   // ── spawn ──────────────────────────────────────────────────────────────────
   const spawnPiece = useCallback(b => {
@@ -447,9 +449,14 @@ export default function Tetris() {
     // T-spin detection
     let tSpin = false;
     if (piece.key==="T" && lastRotation.current) {
-      const corners = [[piece.y,piece.x],[piece.y,piece.x+2],[piece.y+2,piece.x],[piece.y+2,piece.x+2]];
-      const occ = corners.filter(([y,x]) => y>=ROWS||x<0||x>=COLS||(b[y]&&b[y][x])).length;
-      if (occ>=3) tSpin=true;
+      const py = piece.y;
+      const px = piece.x;
+      let occ = 0;
+      if (py >= ROWS || px < 0 || px >= COLS || (b[py] && b[py][px])) occ++;
+      if (py >= ROWS || px + 2 < 0 || px + 2 >= COLS || (b[py] && b[py][px + 2])) occ++;
+      if (py + 2 >= ROWS || px < 0 || px >= COLS || (b[py + 2] && b[py + 2][px])) occ++;
+      if (py + 2 >= ROWS || px + 2 < 0 || px + 2 >= COLS || (b[py + 2] && b[py + 2][px + 2])) occ++;
+      if (occ >= 3) tSpin = true;
     }
 
     const full = findFullRows(locked);
